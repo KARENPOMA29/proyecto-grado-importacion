@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Eye, Trash, Plus, Pencil } from "lucide-react";
 
 import GridGenerico from "@/components/Grid";
-import Details from "@/components/details"; // tu wrapper al DetailsDialog
+import Details from "@/components/details";
 import DeleteConfirm from "@/components/deleteConfirm";
 
 import ServiceMovimiento from "@/services/ServiceMovimiento";
@@ -10,6 +10,7 @@ import ServiceProducto from "@/services/ServiceProducto";
 
 import { toast } from "react-toastify";
 import InventarioFlow from "./InventarioFlow";
+import { useAuth } from "@/context/AuthContext"; // 👈
 
 export default function MovimientoList() {
   const [selectedId, setSelectedId] = useState(null);
@@ -18,6 +19,13 @@ export default function MovimientoList() {
   const [productos, setProductos] = useState([]);
 
   const gridRef = useRef(null);
+
+  // 🔐 rol
+  const { user } = useAuth();
+  const roleKey = (user?.rol || "").trim().toLowerCase();
+  const canCreate = roleKey === "administrador" || roleKey === "almacen";
+  const canEdit = roleKey === "administrador"; // 👈 solo admin edita
+  const canDelete = roleKey === "administrador"; // 👈 solo admin borra
 
   // 🔐 obtenemos el empleado logueado, pero NO lo mostramos
   const usuarioIdLogueado = (() => {
@@ -60,9 +68,7 @@ export default function MovimientoList() {
     return productos.find((x) => x.id === id) || null;
   };
 
-  // 👇 ESTA función tiene que ir ANTES de "columns"
   const getTextoProducto = (row) => {
-    // si el backend ya trae el producto embebido
     if (row.producto) {
       return (
         row.producto.numeroSerie ||
@@ -70,7 +76,6 @@ export default function MovimientoList() {
         `Producto #${row.producto.id}`
       );
     }
-    // fallback al caché
     const prodId = getProductoIdFromRow(row);
     if (!prodId) return "—";
     const p = getProductoFromCache(prodId);
@@ -85,7 +90,6 @@ export default function MovimientoList() {
     );
   };
 
-  // 👇 columnas
   const columns = [
     {
       name: "Producto",
@@ -118,69 +122,60 @@ export default function MovimientoList() {
     },
   ];
 
-const detailsFields = [
-  // ==== Movimiento ====
-  { label: "Producto (serie)", key: "productoSerie" },
-  { label: "Producto (descripción)", key: "productoDescripcion" },
-  { label: "Tipo de movimiento", key: "tipoMovimiento" },
-  {
-    label: "Almacén",
-    key: "almacen",
-    format: (a, row) => a?.nombre ?? row?.almacenNombre ?? "—",
-  },
-  {
-    label: "Fecha",
-    key: "fecha",
-    format: (v) => (v ? new Date(v).toLocaleString() : "—"),
-  },
-  {
-    label: "Usuario que registró",
-    key: "usuarioId",
-    format: (v) => v ?? "—",
-  },
+  const detailsFields = [
+    { label: "Producto (serie)", key: "productoSerie" },
+    { label: "Producto (descripción)", key: "productoDescripcion" },
+    { label: "Tipo de movimiento", key: "tipoMovimiento" },
+    {
+      label: "Almacén",
+      key: "almacen",
+      format: (a, row) => a?.nombre ?? row?.almacenNombre ?? "—",
+    },
+    {
+      label: "Fecha",
+      key: "fecha",
+      format: (v) => (v ? new Date(v).toLocaleString() : "—"),
+    },
+    {
+      label: "Usuario que registró",
+      key: "usuarioId",
+      format: (v) => v ?? "—",
+    },
+    {
+      label: "Color",
+      key: "producto",
+      format: (p) => p?.color ?? "—",
+    },
+    {
+      label: "Precio",
+      key: "producto",
+      format: (p) => (p?.precio != null ? `${p.precio} Bs` : "—"),
+    },
+    {
+      label: "Garantía",
+      key: "producto",
+      format: (p) =>
+        p?.duracionGarantia
+          ? `${p.duracionGarantia} ${p.tipoGarantia ?? ""}`.trim()
+          : "—",
+    },
+    {
+      label: "Categoría",
+      key: "categoria",
+      format: (c) => c?.nombre ?? "—",
+    },
+    {
+      label: "Modelo",
+      key: "modeloProducto",
+      format: (m) => m?.nombreModelo ?? "—",
+    },
+    {
+      label: "Importación",
+      key: "importacion",
+      format: (i) => i?.codigo ?? "—",
+    },
+  ];
 
-  // ==== Producto ====
-  {
-    label: "Color",
-    key: "producto",
-    format: (p) => p?.color ?? "—",
-  },
-  {
-    label: "Precio",
-    key: "producto",
-    format: (p) => (p?.precio != null ? `${p.precio} Bs` : "—"),
-  },
-  {
-    label: "Garantía",
-    key: "producto",
-    format: (p) =>
-      p?.duracionGarantia
-        ? `${p.duracionGarantia} ${p.tipoGarantia ?? ""}`.trim()
-        : "—",
-  },
-
-  // ==== Nombres de relaciones ====
-  {
-    label: "Categoría",
-    key: "categoria",
-    format: (c) => c?.nombre ?? "—",
-  },
-  {
-    label: "Modelo",
-    key: "modeloProducto",
-    format: (m) => m?.nombreModelo ?? "—",
-  },
-  {
-    label: "Importación",
-    key: "importacion",
-    format: (i) => i?.codigo ?? "—",
-  },
-];
-
-
-
-  // 👉 ahora SÍ: no llamamos al backend aquí,
-  // dejamos que <Details /> lo haga
   const handleOpenDetails = (movId) => {
     setSelectedId(movId);
   };
@@ -200,16 +195,18 @@ const detailsFields = [
     <div className="flex flex-col gap-y-6 p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-          Registro de entradas
+          Registro de entradas de productos
         </h1>
 
-        <button
-          onClick={() => setShowInventarioFlow(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 font-medium"
-        >
-          <Plus size={18} />
-          Agregar movimiento
-        </button>
+        {canCreate && (
+          <button
+            onClick={() => setShowInventarioFlow(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duración-200 font-medium"
+          >
+            <Plus size={18} />
+            Agregar movimiento
+          </button>
+        )}
       </div>
 
       <GridGenerico
@@ -238,32 +235,36 @@ const detailsFields = [
         pageSize={10}
         renderActions={(row) => (
           <div className="flex gap-x-2 justify-end">
-            {/* ver detalles */}
+            {/* 👁 ver detalles: todos */}
             <button
-              className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors duration-200"
+              className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors duración-200"
               onClick={() => handleOpenDetails(row.id)}
               title="Ver detalles"
             >
               <Eye size={16} />
             </button>
 
-            {/* editar (si tu GridGenerico expone un método de edición) */}
-            <button
-              className="p-2 text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors duration-200"
-              onClick={() => gridRef.current?.openEdit?.(row)}
-              title="Editar"
-            >
-              <Pencil size={16} />
-            </button>
+            {/* ✏️ editar: solo Admin */}
+            {canEdit && (
+              <button
+                className="p-2 text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors duración-200"
+                onClick={() => gridRef.current?.openEdit?.(row)}
+                title="Editar"
+              >
+                <Pencil size={16} />
+              </button>
+            )}
 
-            {/* eliminar */}
-            <button
-              className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duration-200"
-              onClick={() => setIdToDelete(row.id)}
-              title="Eliminar"
-            >
-              <Trash size={16} />
-            </button>
+            {/* 🗑 eliminar: solo Admin */}
+            {canDelete && (
+              <button
+                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duración-200"
+                onClick={() => setIdToDelete(row.id)}
+                title="Eliminar"
+              >
+                <Trash size={16} />
+              </button>
+            )}
           </div>
         )}
       />
@@ -276,7 +277,7 @@ const detailsFields = [
         onClose={() => setSelectedId(null)}
       />
 
-      {idToDelete && (
+      {idToDelete && canDelete && (
         <DeleteConfirm
           title="¿Eliminar movimiento?"
           message="Esta acción eliminará el movimiento de inventario y no se podrá deshacer."

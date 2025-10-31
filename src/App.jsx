@@ -4,13 +4,11 @@ import { AuthProvider } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Login from "./routes/loginauth/loginauth";
 
-// Dashboards por rol (usa tus archivos creados con MUI)
 import AdminDashboard from "@/routes/pages/dashboards/AdminDashboard";
 import VentasDashboard from "@/routes/pages/dashboards/VentasDashboard";
 import AlmacenDashboard from "@/routes/pages/dashboards/AlmacenDashboard";
 import PilotoDashboard from "@/routes/pages/dashboards/PilotoDashboard";
 
-// Página simple para “no autorizado”
 const Unauthorized = () => <div style={{ padding: 24 }}>No tiene permisos para ver esta página</div>;
 
 function App() {
@@ -18,11 +16,11 @@ function App() {
     <Router>
       <AuthProvider>
         <Routes>
-          {/* Rutas públicas */}
+          {/* públicas */}
           <Route path="/login" element={<Login />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
 
-          {/* Rutas protegidas por rol */}
+          {/* admin */}
           <Route
             path="/admin/*"
             element={
@@ -32,6 +30,7 @@ function App() {
             }
           />
 
+          {/* ventas */}
           <Route
             path="/ventas/*"
             element={
@@ -50,6 +49,8 @@ function App() {
             }
           />
 
+
+          {/* pilotero */}
           <Route
             path="/pilotero/*"
             element={
@@ -59,8 +60,9 @@ function App() {
             }
           />
 
-          {/* Redirecciones y 404 básico */}
+          {/* raíz */}
           <Route path="/" element={<Navigate to="/login" replace />} />
+          {/* 404 */}
           <Route path="*" element={<Navigate to="/unauthorized" replace />} />
         </Routes>
       </AuthProvider>

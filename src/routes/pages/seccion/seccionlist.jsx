@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PencilLine, Trash, Eye } from "lucide-react";
 import GridGenerico from "@/components/Grid";
 import DeleteConfirm from "@/components/deleteConfirm";
-import DetailsDialog from "@/components/details"; // 👈 usamos DetailsDialog (el que recibe id + fetchData)
+import DetailsDialog from "@/components/details";
 import SeccionForm from "./seccionForm";
 import { toast } from "react-toastify";
 
+import { useAuth } from "@/context/AuthContext"; // 👈
 import ServiceSeccion from "@/services/ServiceSeccion";
 import ServiceAlmacen from "@/services/ServiceAlmacen";
 import ServiceModeloProducto from "@/services/ServiceModeloProducto";
@@ -19,7 +20,7 @@ const resolveModelName = (m) =>
   (m?.id != null ? `Modelo #${m.id}` : "—");
 
 const SeccionList = () => {
-  const [selectedId, setSelectedId] = useState(null);     // 👈 ID para DetailsDialog
+  const [selectedId, setSelectedId] = useState(null);
   const [idToDelete, setIdToDelete] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState(null);
@@ -29,17 +30,23 @@ const SeccionList = () => {
 
   const gridRef = useRef(null);
 
+  // 👇 rol
+  const { user } = useAuth();
+  const roleKey = (user?.rol || "").trim().toLowerCase();
+  const canCreate = roleKey === "administrador" || roleKey === "almacen";
+  const canEdit   = roleKey === "administrador" || roleKey === "almacen";
+  const canDelete = roleKey === "administrador";
+
   // Cargar catálogos (almacenes y modelos)
   useEffect(() => {
     (async () => {
       try {
         const almRes = await ServiceAlmacen.getAll();
-        const almList = Array.isArray(almRes) ? almRes : (almRes.items ?? []);
+        const almList = Array.isArray(almRes) ? almRes : almRes.items ?? [];
         setAlmacenes(almList);
 
         const modRes = await ServiceModeloProducto.getAll();
-        const modListRaw = Array.isArray(modRes) ? modRes : (modRes.items ?? []);
-        // Normaliza cada modelo con _nombre
+        const modListRaw = Array.isArray(modRes) ? modRes : modRes.items ?? [];
         const modList = modListRaw.map((m) => ({ ...m, _nombre: resolveModelName(m) }));
         setModelos(modList);
       } catch (e) {
@@ -61,25 +68,44 @@ const SeccionList = () => {
     return m;
   }, [modelos]);
 
-  // Columnas para react-data-table-component
   const columns = [
-    { name: "Almacén", selector: (r) => almacenMap[r.almacenId] ?? "—", sortable: true, minWidth: "180px" },
-    { name: "Modelo", selector: (r) => modeloMap[r.modeloId] ?? "—", sortable: true, minWidth: "180px" },
-    { name: "Descripción", selector: (r) => r.descripcion ?? "—", sortable: true, minWidth: "240px", grow: 2 },
+    {
+      name: "Almacén",
+      selector: (r) => almacenMap[r.almacenId] ?? "—",
+      sortable: true,
+      minWidth: "180px",
+    },
+    {
+      name: "Modelo",
+      selector: (r) => modeloMap[r.modeloId] ?? "—",
+      sortable: true,
+      minWidth: "180px",
+    },
+    {
+      name: "Descripción",
+      selector: (r) => r.descripcion ?? "—",
+      sortable: true,
+      minWidth: "240px",
+      grow: 2,
+    },
     {
       name: "Registrado",
-      selector: (r) => (r.fechaRegistro ? new Date(r.fechaRegistro).toLocaleString() : "—"),
+      selector: (r) =>
+        r.fechaRegistro ? new Date(r.fechaRegistro).toLocaleString() : "—",
       sortable: true,
       minWidth: "200px",
     },
   ];
 
-  // Campos para DetailsDialog (usa 'key' + 'format')
   const detailsFields = [
     { label: "Almacén", key: "almacenId", format: (v) => almacenMap[v] ?? "—" },
-    { label: "Modelo",  key: "modeloId",  format: (v) => modeloMap[v]  ?? "—" },
+    { label: "Modelo", key: "modeloId", format: (v) => modeloMap[v] ?? "—" },
     { label: "Descripción", key: "descripcion" },
-    { label: "Fecha Registro", key: "fechaRegistro", format: (v) => (v ? new Date(v).toLocaleString() : "—") },
+    {
+      label: "Fecha Registro",
+      key: "fechaRegistro",
+      format: (v) => (v ? new Date(v).toLocaleString() : "—"),
+    },
   ];
 
   const handleEdit = async (id) => {
@@ -106,25 +132,26 @@ const SeccionList = () => {
 
   return (
     <div className="flex flex-col gap-y-6 p-4 sm:p-6">
-      {/* Header al estilo Sucursal/Almacén */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
           Gestión de Secciones
         </h1>
 
-        <button
-          onClick={() => {
-            setFormData(null);
-            setShowForm(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 font-medium"
-        >
-          <PencilLine size={18} />
-          Nueva Sección
-        </button>
+        {canCreate && (
+          <button
+            onClick={() => {
+              setFormData(null);
+              setShowForm(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 font-medium"
+          >
+            <PencilLine size={18} />
+            Nueva Sección
+          </button>
+        )}
       </div>
 
-      {/* GridGenerico con service (como en las otras pantallas) */}
       <GridGenerico
         ref={gridRef}
         service={ServiceSeccion}
@@ -135,15 +162,17 @@ const SeccionList = () => {
         pageSize={10}
         renderActions={(row) => (
           <div className="flex gap-x-2 justify-end">
+            {/* 👁 ver siempre */}
             <button
               className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors duration-200"
-              onClick={() => setSelectedId(row.id)}   // 👈 solo pasamos el ID
+              onClick={() => setSelectedId(row.id)}
               title="Ver detalles"
             >
               <Eye size={16} />
             </button>
 
-            <>
+            {/* ✏️ editar: Admin + Almacen */}
+            {canEdit && (
               <button
                 className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors duration-200"
                 onClick={() => handleEdit(row.id)}
@@ -151,7 +180,10 @@ const SeccionList = () => {
               >
                 <PencilLine size={16} />
               </button>
+            )}
 
+            {/* 🗑️ eliminar: solo Admin */}
+            {canDelete && (
               <button
                 className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duración-200"
                 onClick={() => setIdToDelete(row.id)}
@@ -159,12 +191,11 @@ const SeccionList = () => {
               >
                 <Trash size={16} />
               </button>
-            </>
+            )}
           </div>
         )}
       />
 
-      {/* DetailsDialog (id + fetchData + fields con 'key') */}
       <DetailsDialog
         open={!!selectedId}
         id={selectedId}
@@ -174,8 +205,7 @@ const SeccionList = () => {
         title="Detalles de la Sección"
       />
 
-      {/* Confirmar eliminar (condicional) */}
-      {idToDelete && (
+      {idToDelete && canDelete && (
         <DeleteConfirm
           title="¿Eliminar sección?"
           message="Esta acción eliminará la sección permanentemente y no se podrá deshacer."
@@ -184,7 +214,6 @@ const SeccionList = () => {
         />
       )}
 
-      {/* Formulario (mismo estilo MUI que Sucursal/Almacén) */}
       {showForm && (
         <SeccionForm
           open={showForm}

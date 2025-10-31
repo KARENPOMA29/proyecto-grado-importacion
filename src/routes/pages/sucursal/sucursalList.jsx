@@ -14,18 +14,28 @@ const SucursalList = () => {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState(null);
   const gridRef = useRef(null);
+
   const { user } = useAuth();
-  const isAdmin = user?.rol === "Administrador";
+  // 👇 mismo criterio en todos tus list
+  const roleKey = (user?.rol || "").trim().toLowerCase();
+
+  const canCreate = roleKey === "administrador" || roleKey === "almacen";
+  const canEdit   = roleKey === "administrador" || roleKey === "almacen";
+  const canDelete = roleKey === "administrador";
 
   const columns = [
-    { name: "Nombre", selector: r => r.nombre, sortable: true, minWidth: "180px" },
-    { name: "Teléfono", selector: r => r.telefono ?? '-', sortable: true, minWidth: "140px" },
+    { name: "Nombre", selector: (r) => r.nombre, sortable: true, minWidth: "180px" },
+    { name: "Teléfono", selector: (r) => r.telefono ?? "-", sortable: true, minWidth: "140px" },
   ];
 
   const fields = [
     { label: "Nombre", key: "nombre" },
     { label: "Teléfono", key: "telefono" },
-    { label: "Fecha Registro", key: "fechaRegistro", format: v => new Date(v).toLocaleString() },
+    {
+      label: "Fecha Registro",
+      key: "fechaRegistro",
+      format: (v) => (v ? new Date(v).toLocaleString() : "—"),
+    },
   ];
 
   const handleDelete = async () => {
@@ -52,12 +62,18 @@ const SucursalList = () => {
 
   return (
     <div className="flex flex-col gap-y-6 p-4 sm:p-6">
+      {/* HEADER */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Gestión de Sucursales</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+          Gestión de Sucursales
+        </h1>
 
-        {isAdmin && (
+        {canCreate && (
           <button
-            onClick={() => { setFormData(null); setShowForm(true); }}
+            onClick={() => {
+              setFormData(null);
+              setShowForm(true);
+            }}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 font-medium"
           >
             <PencilLine size={18} />
@@ -75,6 +91,7 @@ const SucursalList = () => {
         pageSize={10}
         renderActions={(row) => (
           <div className="flex gap-x-2 justify-end">
+            {/* 👁 ver siempre */}
             <button
               className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors duration-200"
               onClick={() => setSelectedId(row.id)}
@@ -82,23 +99,27 @@ const SucursalList = () => {
             >
               <Eye size={16} />
             </button>
-            {isAdmin && (
-              <>
-                <button
-                  className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors duration-200"
-                  onClick={() => handleEdit(row.id)}
-                  title="Editar"
-                >
-                  <PencilLine size={16} />
-                </button>
-                <button
-                  className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duration-200"
-                  onClick={() => setIdToDelete(row.id)}
-                  title="Eliminar"
-                >
-                  <Trash size={16} />
-                </button>
-              </>
+
+            {/* ✏️ editar: Admin + Almacen */}
+            {canEdit && (
+              <button
+                className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors duration-200"
+                onClick={() => handleEdit(row.id)}
+                title="Editar"
+              >
+                <PencilLine size={16} />
+              </button>
+            )}
+
+            {/* 🗑️ eliminar: solo Admin */}
+            {canDelete && (
+              <button
+                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duration-200"
+                onClick={() => setIdToDelete(row.id)}
+                title="Eliminar"
+              >
+                <Trash size={16} />
+              </button>
             )}
           </div>
         )}
@@ -112,7 +133,7 @@ const SucursalList = () => {
         onClose={() => setSelectedId(null)}
       />
 
-      {idToDelete && (
+      {idToDelete && canDelete && (
         <DeleteConfirm
           title="¿Eliminar sucursal?"
           message="Esta acción eliminará la sucursal permanentemente y no se podrá deshacer."
@@ -125,7 +146,10 @@ const SucursalList = () => {
         <SucursalForm
           initialData={formData}
           onClose={() => setShowForm(false)}
-          onSuccess={() => { gridRef.current?.refetch(); setShowForm(false); }}
+          onSuccess={() => {
+            gridRef.current?.refetch();
+            setShowForm(false);
+          }}
         />
       )}
     </div>

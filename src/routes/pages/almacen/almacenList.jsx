@@ -1,3 +1,4 @@
+// src/routes/pages/almacen/AlmacenList.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PencilLine, Trash, Eye } from "lucide-react";
 import GridGenerico from "@/components/Grid";
@@ -18,13 +19,18 @@ const AlmacenList = () => {
   const gridRef = useRef(null);
 
   const { user } = useAuth();
-  const isAdmin = user?.rol === "Administrador";
+  const roleKey = (user?.rol || "").trim().toLowerCase(); // "Almacen" -> "almacen"
+
+  const canCreate = roleKey === "administrador" || roleKey === "almacen";
+  const canEdit = roleKey === "administrador" || roleKey === "almacen";
+  const canDelete = roleKey === "administrador";
+
 
   useEffect(() => {
     (async () => {
       try {
         const s = await ServiceSucursal.getAll();
-        const list = Array.isArray(s) ? s : (s.items ?? []);
+        const list = Array.isArray(s) ? s : s.items ?? [];
         setSucursales(list);
       } catch (e) {
         console.error("Error cargando sucursales:", e);
@@ -39,15 +45,32 @@ const AlmacenList = () => {
   }, [sucursales]);
 
   const columns = [
-    { name: "Nombre", selector: r => r.nombre, sortable: true, minWidth: "220px" },
-    { name: "Sucursal", selector: r => sucursalMap[r.sucursalId] ?? "—", sortable: true, minWidth: "180px" },
-    { name: "Registrado", selector: r => r.fechaRegistro ? new Date(r.fechaRegistro).toLocaleString() : "—", sortable: true, minWidth: "200px" },
+    { name: "Nombre", selector: (r) => r.nombre, minWidth: "220px" },
+    {
+      name: "Sucursal",
+      selector: (r) => sucursalMap[r.sucursalId] ?? "—",
+      minWidth: "180px",
+    },
+    {
+      name: "Registrado",
+      selector: (r) =>
+        r.fechaRegistro ? new Date(r.fechaRegistro).toLocaleString() : "—",
+      minWidth: "200px",
+    },
   ];
 
   const fields = [
     { label: "Nombre", key: "nombre" },
-    { label: "Sucursal", key: "sucursalId", format: v => sucursalMap[v] ?? "—" },
-    { label: "Fecha Registro", key: "fechaRegistro", format: v => v ? new Date(v).toLocaleString() : "—" },
+    {
+      label: "Sucursal",
+      key: "sucursalId",
+      format: (v) => sucursalMap[v] ?? "—",
+    },
+    {
+      label: "Fecha Registro",
+      key: "fechaRegistro",
+      format: (v) => (v ? new Date(v).toLocaleString() : "—"),
+    },
   ];
 
   const handleDelete = async () => {
@@ -74,15 +97,18 @@ const AlmacenList = () => {
 
   return (
     <div className="flex flex-col gap-y-6 p-4 sm:p-6">
-      {/* HEADER estilo Sección/Sucursal */}
+      {/* HEADER */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
           Gestión de Almacenes
         </h1>
 
-        {isAdmin && (
+        {canCreate && (
           <button
-            onClick={() => { setFormData(null); setShowForm(true); }}
+            onClick={() => {
+              setFormData(null);
+              setShowForm(true);
+            }}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 font-medium"
           >
             <PencilLine size={18} />
@@ -100,6 +126,7 @@ const AlmacenList = () => {
         pageSize={10}
         renderActions={(row) => (
           <div className="flex gap-x-2 justify-end">
+            {/* 👁 ver siempre */}
             <button
               className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors duration-200"
               onClick={() => setSelectedId(row.id)}
@@ -107,23 +134,27 @@ const AlmacenList = () => {
             >
               <Eye size={16} />
             </button>
-            {isAdmin && (
-              <>
-                <button
-                  className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors duration-200"
-                  onClick={() => handleEdit(row.id)}
-                  title="Editar"
-                >
-                  <PencilLine size={16} />
-                </button>
-                <button
-                  className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duration-200"
-                  onClick={() => setIdToDelete(row.id)}
-                  title="Eliminar"
-                >
-                  <Trash size={16} />
-                </button>
-              </>
+
+            {/* ✏️ editar: Administrador + Almacen */}
+            {canEdit && (
+              <button
+                className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors duration-200"
+                onClick={() => handleEdit(row.id)}
+                title="Editar"
+              >
+                <PencilLine size={16} />
+              </button>
+            )}
+
+            {/* 🗑️ eliminar: solo Administrador */}
+            {canDelete && (
+              <button
+                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duration-200"
+                onClick={() => setIdToDelete(row.id)}
+                title="Eliminar"
+              >
+                <Trash size={16} />
+              </button>
             )}
           </div>
         )}
@@ -137,7 +168,7 @@ const AlmacenList = () => {
         onClose={() => setSelectedId(null)}
       />
 
-      {idToDelete && (
+      {idToDelete && canDelete && (
         <DeleteConfirm
           title="¿Eliminar almacén?"
           message="Esta acción eliminará el almacén permanentemente y no se podrá deshacer."
@@ -149,7 +180,10 @@ const AlmacenList = () => {
       {showForm && (
         <AlmacenForm
           onClose={() => setShowForm(false)}
-          onSuccess={() => { gridRef.current?.refetch(); setShowForm(false); }}
+          onSuccess={() => {
+            gridRef.current?.refetch();
+            setShowForm(false);
+          }}
           initialData={formData}
           sucursales={sucursales}
         />
