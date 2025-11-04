@@ -9,6 +9,8 @@ import ServiceImportacion from "@/services/ServiceImportacion";
 import ServiceProveedor from "@/services/ServiceProveedor";
 import { toast } from "react-toastify";
 import { useAuth } from "@/context/AuthContext"; // 👈
+import ServiceEmpleado from "@/services/ServiceEmpleado"; // 👈 importa esto
+
 
 const ImportacionList = () => {
   const [selectedId, setSelectedId] = useState(null);
@@ -66,35 +68,34 @@ const ImportacionList = () => {
   ];
 
   const detailsFields = [
-    { label: "Código", key: "codigo" },
-    {
-      label: "Proveedor",
-      key: "proveedorId",
-      format: (v) => getProveedorNombre(v),
-    },
-    {
-      label: "Fecha llegada",
-      key: "fechaLlegada",
-      format: (v) => (v ? new Date(v).toLocaleString() : "—"),
-    },
-    { label: "Estado", key: "estado" },
-    { label: "Observaciones", key: "observaciones" },
-    {
-      label: "Empleado / Usuario",
-      key: "empleado",
-      format: (emp, row) =>
-        emp?.nombre ??
-        row?.empleadoNombre ??
-        row?.empleadoId ??
-        row?.usuarioNombre ??
-        "—",
-    },
-    {
-      label: "Fecha Registro",
-      key: "fechaRegistro",
-      format: (v) => (v ? new Date(v).toLocaleString() : "—"),
-    },
-  ];
+  { label: "Código", key: "codigo" },
+  {
+    label: "Proveedor",
+    key: "proveedorId",
+    format: (v) => getProveedorNombre(v),
+  },
+  {
+    label: "Fecha llegada",
+    key: "fechaLlegada",
+    format: (v) => (v ? new Date(v).toLocaleString() : "—"),
+  },
+  { label: "Estado", key: "estado" },
+  { label: "Observaciones", key: "observaciones" },
+  {
+    label: "Registrado por",
+    key: "empleadoNombre", // 👈 porque lo acabamos de inyectar arriba
+    format: (v, row) =>
+      v ??
+      row?.usuarioNombre ??
+      (row?.empleadoId ? `ID: ${row.empleadoId}` : "—"),
+  },
+  {
+    label: "Fecha Registro",
+    key: "fechaRegistro",
+    format: (v) => (v ? new Date(v).toLocaleString() : "—"),
+  },
+];
+
 
   const handleEdit = (row) => {
     setFormData(row);
@@ -200,11 +201,30 @@ const ImportacionList = () => {
         )}
       />
 
-      {/* Detalles */}
       <Details
         open={!!selectedId}
         id={selectedId}
-        fetchData={ServiceImportacion.getById}
+        fetchData={async (id) => {
+          // 1. traer la importación
+          const imp = await ServiceImportacion.getById(id);
+
+          // 2. si tiene empleadoId, intentamos traer su nombre
+          if (imp?.empleadoId) {
+            try {
+              const emp = await ServiceEmpleado.getById(imp.empleadoId);
+              // normalizamos a un campo que ya buscamos en detailsFields
+              return {
+                ...imp,
+                empleadoNombre: emp?.nombre ?? emp?.nombres ?? null,
+              };
+            } catch (e) {
+              // si falla, devolvemos igual la importación
+              return imp;
+            }
+          }
+
+          return imp;
+        }}
         fields={detailsFields}
         onClose={() => setSelectedId(null)}
       />

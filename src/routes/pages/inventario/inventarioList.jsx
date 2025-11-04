@@ -1,16 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Eye, Trash, Plus, Pencil } from "lucide-react";
-
 import GridGenerico from "@/components/Grid";
-import Details from "@/components/details";
+import Details from "@/components/details"; 
 import DeleteConfirm from "@/components/deleteConfirm";
-
 import ServiceMovimiento from "@/services/ServiceMovimiento";
 import ServiceProducto from "@/services/ServiceProducto";
-
 import { toast } from "react-toastify";
 import InventarioFlow from "./InventarioFlow";
-import { useAuth } from "@/context/AuthContext"; // 👈
 
 export default function MovimientoList() {
   const [selectedId, setSelectedId] = useState(null);
@@ -19,15 +15,6 @@ export default function MovimientoList() {
   const [productos, setProductos] = useState([]);
 
   const gridRef = useRef(null);
-
-  // 🔐 rol
-  const { user } = useAuth();
-  const roleKey = (user?.rol || "").trim().toLowerCase();
-  const canCreate = roleKey === "administrador" || roleKey === "almacen";
-  const canEdit = roleKey === "administrador"; // 👈 solo admin edita
-  const canDelete = roleKey === "administrador"; // 👈 solo admin borra
-
-  // 🔐 obtenemos el empleado logueado, pero NO lo mostramos
   const usuarioIdLogueado = (() => {
     try {
       const raw = localStorage.getItem("user");
@@ -38,8 +25,6 @@ export default function MovimientoList() {
       return null;
     }
   })();
-
-  // cargar cache de productos
   useEffect(() => {
     (async () => {
       try {
@@ -62,12 +47,10 @@ export default function MovimientoList() {
       null
     );
   };
-
   const getProductoFromCache = (id) => {
     if (!id) return null;
     return productos.find((x) => x.id === id) || null;
   };
-
   const getTextoProducto = (row) => {
     if (row.producto) {
       return (
@@ -89,7 +72,6 @@ export default function MovimientoList() {
       `Producto #${prodId}`
     );
   };
-
   const columns = [
     {
       name: "Producto",
@@ -122,60 +104,54 @@ export default function MovimientoList() {
     },
   ];
 
-  const detailsFields = [
-    { label: "Producto (serie)", key: "productoSerie" },
-    { label: "Producto (descripción)", key: "productoDescripcion" },
-    { label: "Tipo de movimiento", key: "tipoMovimiento" },
-    {
-      label: "Almacén",
-      key: "almacen",
-      format: (a, row) => a?.nombre ?? row?.almacenNombre ?? "—",
-    },
-    {
-      label: "Fecha",
-      key: "fecha",
-      format: (v) => (v ? new Date(v).toLocaleString() : "—"),
-    },
-    {
-      label: "Usuario que registró",
-      key: "usuarioId",
-      format: (v) => v ?? "—",
-    },
-    {
-      label: "Color",
-      key: "producto",
-      format: (p) => p?.color ?? "—",
-    },
-    {
-      label: "Precio",
-      key: "producto",
-      format: (p) => (p?.precio != null ? `${p.precio} Bs` : "—"),
-    },
-    {
-      label: "Garantía",
-      key: "producto",
-      format: (p) =>
-        p?.duracionGarantia
-          ? `${p.duracionGarantia} ${p.tipoGarantia ?? ""}`.trim()
-          : "—",
-    },
-    {
-      label: "Categoría",
-      key: "categoria",
-      format: (c) => c?.nombre ?? "—",
-    },
-    {
-      label: "Modelo",
-      key: "modeloProducto",
-      format: (m) => m?.nombreModelo ?? "—",
-    },
-    {
-      label: "Importación",
-      key: "importacion",
-      format: (i) => i?.codigo ?? "—",
-    },
-  ];
-
+const detailsFields = [
+  { label: "Producto (serie)", key: "productoSerie" },
+  { label: "Producto (descripción)", key: "productoDescripcion" },
+  { label: "Tipo de movimiento", key: "tipoMovimiento" },
+  {
+    label: "Almacén",
+    key: "almacen",
+    format: (a, row) => a?.nombre ?? row?.almacenNombre ?? "—",
+  },
+  {
+    label: "Fecha",
+    key: "fecha",
+    format: (v) => (v ? new Date(v).toLocaleString() : "—"),
+  },
+  {
+    label: "Color",
+    key: "producto",
+    format: (p) => p?.color ?? "—",
+  },
+  {
+    label: "Precio",
+    key: "producto",
+    format: (p) => (p?.precio != null ? `${p.precio} Bs` : "—"),
+  },
+  {
+    label: "Garantía",
+    key: "producto",
+    format: (p) =>
+      p?.duracionGarantia
+        ? `${p.duracionGarantia} ${p.tipoGarantia ?? ""}`.trim()
+        : "—",
+  },
+  {
+    label: "Categoría",
+    key: "categoria",
+    format: (c) => c?.nombre ?? "—",
+  },
+  {
+    label: "Modelo",
+    key: "modeloProducto",
+    format: (m) => m?.nombreModelo ?? "—",
+  },
+  {
+    label: "Importación",
+    key: "importacion",
+    format: (i) => i?.codigo ?? "—",
+  },
+];
   const handleOpenDetails = (movId) => {
     setSelectedId(movId);
   };
@@ -190,7 +166,6 @@ export default function MovimientoList() {
       toast.error(e.message || "No se pudo eliminar el movimiento");
     }
   };
-
   return (
     <div className="flex flex-col gap-y-6 p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -198,15 +173,13 @@ export default function MovimientoList() {
           Registro de entradas de productos
         </h1>
 
-        {canCreate && (
-          <button
-            onClick={() => setShowInventarioFlow(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duración-200 font-medium"
-          >
-            <Plus size={18} />
-            Agregar movimiento
-          </button>
-        )}
+        <button
+          onClick={() => setShowInventarioFlow(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 font-medium"
+        >
+          <Plus size={18} />
+          Agregar movimiento
+        </button>
       </div>
 
       <GridGenerico
@@ -235,40 +208,24 @@ export default function MovimientoList() {
         pageSize={10}
         renderActions={(row) => (
           <div className="flex gap-x-2 justify-end">
-            {/* 👁 ver detalles: todos */}
             <button
-              className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors duración-200"
+              className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors duration-200"
               onClick={() => handleOpenDetails(row.id)}
               title="Ver detalles"
             >
               <Eye size={16} />
             </button>
-
-            {/* ✏️ editar: solo Admin */}
-            {canEdit && (
-              <button
-                className="p-2 text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors duración-200"
-                onClick={() => gridRef.current?.openEdit?.(row)}
-                title="Editar"
-              >
-                <Pencil size={16} />
-              </button>
-            )}
-
-            {/* 🗑 eliminar: solo Admin */}
-            {canDelete && (
-              <button
-                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duración-200"
-                onClick={() => setIdToDelete(row.id)}
-                title="Eliminar"
-              >
-                <Trash size={16} />
-              </button>
-            )}
+            
+            <button
+              className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duration-200"
+              onClick={() => setIdToDelete(row.id)}
+              title="Eliminar"
+            >
+              <Trash size={16} />
+            </button>
           </div>
         )}
       />
-
       <Details
         open={!!selectedId}
         id={selectedId}
@@ -276,8 +233,7 @@ export default function MovimientoList() {
         fields={detailsFields}
         onClose={() => setSelectedId(null)}
       />
-
-      {idToDelete && canDelete && (
+      {idToDelete && (
         <DeleteConfirm
           title="¿Eliminar movimiento?"
           message="Esta acción eliminará el movimiento de inventario y no se podrá deshacer."

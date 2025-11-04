@@ -27,10 +27,15 @@ const AlmacenForm = ({ onClose, onSuccess, initialData = null, sucursales = [] }
     formState: { errors },
     reset,
     setValue,
-  } = useForm({ defaultValues: { nombre: "", sucursalId: "" } });
+  } = useForm({
+    defaultValues: { nombre: "", sucursalId: "" },
+  });
 
   const [formError, setFormError] = useState("");
-  const [formTouched, setFormTouched] = useState(false);
+  const [touched, setTouched] = useState({
+    nombre: false,
+    sucursalId: false,
+  });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -41,22 +46,37 @@ const AlmacenForm = ({ onClose, onSuccess, initialData = null, sucursales = [] }
       reset({ nombre: "", sucursalId: "" });
     }
     setFormError("");
-    setFormTouched(false);
+    setTouched({
+      nombre: false,
+      sucursalId: false,
+    });
   }, [initialData, setValue, reset]);
 
   const onSubmit = async (data) => {
     setFormError("");
-    setFormTouched(true);
+    // marcar los campos
+    setTouched({
+      nombre: true,
+      sucursalId: true,
+    });
 
-    if (!data.nombre?.trim()) {
+    // validación extra: nombre sin caracteres raros
+    const nombreLimpio = data.nombre?.trim() || "";
+    const regexNombre = /^[A-Za-zÁÉÍÓÚáéíóúÑñ0-9 .-]+$/;
+
+    if (!nombreLimpio) {
       setFormError("Por favor complete el nombre del almacén");
+      return;
+    }
+    if (!regexNombre.test(nombreLimpio)) {
+      setFormError("El nombre no debe tener caracteres especiales");
       return;
     }
 
     setLoading(true);
     try {
       const payload = {
-        nombre: data.nombre.trim(),
+        nombre: nombreLimpio,
         sucursalId: data.sucursalId === "" ? null : Number(data.sucursalId),
       };
 
@@ -72,7 +92,8 @@ const AlmacenForm = ({ onClose, onSuccess, initialData = null, sucursales = [] }
       reset({ nombre: "", sucursalId: "" });
     } catch (err) {
       console.error("Error al guardar el almacén:", err);
-      const msg = err.response?.data?.detail || err.message || "Error al procesar el almacén";
+      const msg =
+        err.response?.data?.detail || err.message || "Error al procesar el almacén";
       setFormError(msg);
       toast.error(msg);
     } finally {
@@ -80,32 +101,81 @@ const AlmacenForm = ({ onClose, onSuccess, initialData = null, sucursales = [] }
     }
   };
 
+  // para limpiar mientras escribe
+  const handleNombreChange = (e, onChangeRHForm) => {
+    const value = e.target.value.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ0-9 .-]/g, "");
+    onChangeRHForm(value);
+    setTouched((prev) => ({ ...prev, nombre: true }));
+  };
+
   return (
-    <Dialog open={true} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
-      {/* FIX: no anidar h6 dentro de h2 */}
-      <DialogTitle component="div" sx={{ borderBottom: "1px solid", borderColor: "divider", pb: 2 }}>
+    <Dialog
+      open={true} // en tu lista real cambia a open={open}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 2,
+          overflow: "visible", // 👈 para que no se corte el select / autosuggest
+        },
+      }}
+    >
+      <DialogTitle
+        component="div"
+        sx={{ borderBottom: "1px solid", borderColor: "divider", pb: 2 }}
+      >
         <Typography variant="h6" component="span" fontWeight={600}>
           {initialData ? "Editar Almacén" : "Nuevo Almacén"}
         </Typography>
       </DialogTitle>
 
-      <DialogContent sx={{ py: 3 }}>
+      <DialogContent
+        sx={{
+          py: 3,
+          overflow: "visible", // 👈 importantísimo
+          maxHeight: "60vh", // si hay poco alto, que scrollee adentro
+        }}
+      >
         <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
-          <Grid container spacing={3}>
+          <Grid container spacing={2}>
+            {/* NOMBRE */}
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Nombre"
-                {...register("nombre", {
+              <Controller
+                name="nombre"
+                control={control}
+                rules={{
                   required: "Campo requerido",
                   maxLength: { value: 100, message: "Máximo 100 caracteres" },
-                })}
-                error={formTouched && !!errors.nombre}
-                helperText={formTouched && errors.nombre ? errors.nombre.message : ""}
-                disabled={loading}
+                }}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    fullWidth
+                    label="Nombre"
+                    onChange={(e) => handleNombreChange(e, field.onChange)}
+                    error={
+                      (touched.nombre && !!errors.nombre) ||
+                      (touched.nombre &&
+                        field.value &&
+                        !/^[A-Za-zÁÉÍÓÚáéíóúÑñ0-9 .-]+$/.test(field.value))
+                    }
+                    helperText={
+                      touched.nombre && errors.nombre
+                        ? errors.nombre.message
+                        : touched.nombre &&
+                          field.value &&
+                          !/^[A-Za-zÁÉÍÓÚáéíóúÑñ0-9 .-]+$/.test(field.value)
+                        ? "No se permiten caracteres especiales"
+                        : ""
+                    }
+                    disabled={loading}
+                  />
+                )}
               />
             </Grid>
 
+            {/* SUCURSAL */}
             <Grid item xs={12}>
               <FormControl fullWidth disabled={loading}>
                 <InputLabel id="sucursal-label">Sucursal</InputLabel>
@@ -113,7 +183,17 @@ const AlmacenForm = ({ onClose, onSuccess, initialData = null, sucursales = [] }
                   name="sucursalId"
                   control={control}
                   render={({ field }) => (
-                    <Select labelId="sucursal-label" label="Sucursal" {...field}>
+                    <Select
+                      {...field}
+                      labelId="sucursal-label"
+                      label="Sucursal"
+                      MenuProps={{
+                        sx: { zIndex: 2000 }, // 👈 para que quede por encima del dialog
+                      }}
+                      onOpen={() =>
+                        setTouched((prev) => ({ ...prev, sucursalId: true }))
+                      }
+                    >
                       <MenuItem value="">— Ninguna —</MenuItem>
                       {sucursales.map((s) => (
                         <MenuItem key={s.id} value={s.id}>
@@ -127,13 +207,24 @@ const AlmacenForm = ({ onClose, onSuccess, initialData = null, sucursales = [] }
             </Grid>
           </Grid>
 
-          {formError && <Alert severity="error" sx={{ mt: 3 }}>{formError}</Alert>}
+          {formError && (
+            <Alert severity="error" sx={{ mt: 3 }}>
+              {formError}
+            </Alert>
+          )}
         </Box>
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
-        <Button onClick={onClose} variant="outlined" disabled={loading}>Cancelar</Button>
-        <Button onClick={handleSubmit(onSubmit)} variant="contained" disabled={loading} sx={{ minWidth: 100 }}>
+        <Button onClick={onClose} variant="outlined" disabled={loading}>
+          Cancelar
+        </Button>
+        <Button
+          onClick={handleSubmit(onSubmit)}
+          variant="contained"
+          disabled={loading}
+          sx={{ minWidth: 100 }}
+        >
           {loading ? "Guardando..." : "Guardar"}
         </Button>
       </DialogActions>

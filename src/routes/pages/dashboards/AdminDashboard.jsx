@@ -16,7 +16,7 @@ import SeccionList from "@/routes/pages/seccion/seccionList";
 import InventarioList from "@/routes/pages/inventario/inventarioList";
 import ImportList from "@/routes/pages/importaciones/ImportacionList";
 import VentasList from "@/routes/pages/ventas/ventasList";
-
+import ProductList from "@/routes/pages/productos/productoList";
 const Reportes = () => (
   <>
     <Typography variant="h6" gutterBottom>Reportes</Typography>
@@ -61,6 +61,7 @@ export default function AdminDashboard() {
         <Route path="almacenes" element={<AlmacenList />} />
         <Route path="secciones" element={<SeccionList />} />
         <Route path="ventas" element={<VentasList />} />
+        <Route path="productos" element={<ProductList />} />
         {/* cualquier otra ruta dentro de /admin */}
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>

@@ -13,11 +13,11 @@ import {
   Grid,
   Autocomplete,
   Chip,
-  Divider,
   Card,
   CardContent
 } from "@mui/material";
 import ServiceEmpleado from "@/services/ServiceEmpleado";
+import "./EmpleadoFormMod.css";
 
 const FORM_ID = "empleado-form";
 
@@ -32,7 +32,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
     telefono: String(initialData?.telefono ?? ""),
     rol: typeof initialData?.rol === "string" ? initialData.rol : (initialData?.rol?.value || ""),
     usuario: initialData?.usuario || "",
-    contrasena: "", // en edición no se envía salvo que la escribas
+    contrasena: "",
     correo: initialData?.correo || "",
     urlImagen: initialData?.urlImagen ?? "",
   });
@@ -41,7 +41,6 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
   const [formTouched, setFormTouched] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Roles como strings simples
   const roles = useMemo(() => ["Administrador", "Ventas", "Almacen", "Pilotero"], []);
 
   const handleChange = (field, value) => {
@@ -49,7 +48,6 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
     setFormTouched(true);
   };
 
-  // Autogenerados solo en creación
   useEffect(() => {
     if (!initialData) {
       const inicialApellido = String(form.apellido || "").charAt(0).toLowerCase();
@@ -68,7 +66,6 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
         contrasena: nuevaContrasena || prev.contrasena,
       }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.nombre, form.apellido, form.ci, initialData]);
 
   const validateForm = () => {
@@ -95,14 +92,12 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
     return true;
   };
 
-  // Payload saneado: requeridos siempre, opcionales solo si tienen valor; contraseña solo si aplica
   const buildSanitizedPayload = (isEdit) => {
     const ci = String(form.ci || "").replace(/\D/g, "");
     const telefono = String(form.telefono || "").replace(/\D/g, "");
     const rol = typeof form.rol === "string" ? form.rol : (form.rol?.value || "");
 
     const payload = {
-      // requeridos SIEMPRE en edición (evita 422 por "field required")
       nombre: (form.nombre || "").trim(),
       apellido: (form.apellido || "").trim(),
       ci,
@@ -112,11 +107,9 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
       correo: (form.correo || "").trim(),
     };
 
-    // opcionales solo si hay valor
     if ((form.segundoApellido || "").trim()) payload.segundoApellido = form.segundoApellido.trim();
     if ((form.urlImagen || "").trim()) payload.urlImagen = form.urlImagen.trim();
 
-    // contraseña solo si corresponde
     const pwd = (form.contrasena || "").trim();
     if (!isEdit && pwd) payload.contrasena = pwd;
     if (isEdit && pwd) payload.contrasena = pwd;
@@ -134,7 +127,6 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
     setLoading(true);
     try {
       const payload = buildSanitizedPayload(isEdit);
-      // console.log("PUT/POST payload ->", payload);
 
       if (isEdit) {
         await ServiceEmpleado.update(initialData.id, payload);
@@ -144,7 +136,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
         toast.success("Empleado creado correctamente");
       }
 
-      onSuccess(); // padre hace refetch y cierra
+      onSuccess();
     } catch (err) {
       const detail = err.response?.data?.detail ?? err.response?.data ?? err.message;
       const toText = (d) =>
@@ -169,22 +161,10 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
       onClose={onClose} 
       maxWidth="md" 
       fullWidth
-      PaperProps={{ 
-        sx: { 
-          borderRadius: 3,
-          boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
-          maxHeight: "95vh"
-        } 
-      }}
+      PaperProps={{ className: "dialog-paper" }}
     >
-      <DialogTitle sx={{ 
-        background: 'linear-gradient(135deg, #666547ff 0%, #a78927ff 100%)',
-        color: 'white',
-        py: 3,
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        <Box sx={{ position: 'relative', zIndex: 1 }}>
+      <DialogTitle className="dialog-title">
+        <Box className="title-content">
           <Typography variant="h5" fontWeight={700} gutterBottom>
             {isEdit ? "Editar Empleado" : "Nuevo Empleado"}
           </Typography>
@@ -193,12 +173,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
               label={isEdit ? "Modo Edición" : "Modo Creación"} 
               color={isEdit ? "warning" : "success"}
               variant="filled"
-              sx={{ 
-                color: 'white', 
-                fontWeight: 600,
-                background: 'rgba(255,255,255,0.2)',
-                backdropFilter: 'blur(10px)'
-              }} 
+              className="mode-chip"
             />
             <Typography variant="body2" sx={{ opacity: 0.9 }}>
               Complete todos los campos obligatorios
@@ -207,17 +182,16 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
         </Box>
       </DialogTitle>
 
-      <DialogContent dividers sx={{ p: 0, bgcolor: '#f8fafc' }}>
-        <Box sx={{ p: 3 }}>
+      <DialogContent dividers className="dialog-content">
+        <Box className="form-container">
           <Box id={FORM_ID} component="form" onSubmit={handleSubmit} noValidate>
             
-            {/* Sección 1: Información Personal */}
-            <Card sx={{ mb: 3, borderRadius: 2, boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
+            <Card className="section-card">
               <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" fontWeight={600} gutterBottom sx={{ color: '#374151', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="h6" fontWeight={600} gutterBottom className="section-title">
                   Información Personal
                 </Typography>
-                <Grid container spacing={3}>
+                <Grid container spacing={3} className="form-grid">
                   <Grid item xs={12} md={6}>
                     <TextField 
                       fullWidth 
@@ -228,7 +202,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                       helperText={formTouched && !form.nombre ? "Campo requerido" : ""}
                       required 
                       disabled={loading}
-                      variant="outlined"
+                      className="text-field"
                       size="medium"
                     />
                   </Grid>
@@ -243,7 +217,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                       helperText={formTouched && !form.apellido ? "Campo requerido" : ""}
                       required 
                       disabled={loading}
-                      variant="outlined"
+                      className="text-field"
                       size="medium"
                     />
                   </Grid>
@@ -256,7 +230,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                       onChange={(e) => handleChange("segundoApellido", e.target.value)}
                       disabled={loading} 
                       helperText="Opcional" 
-                      variant="outlined"
+                      className="text-field"
                       size="medium"
                     />
                   </Grid>
@@ -272,7 +246,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                       required 
                       disabled={loading} 
                       inputProps={{ maxLength: 8 }}
-                      variant="outlined"
+                      className="text-field"
                       size="medium"
                     />
                   </Grid>
@@ -280,13 +254,12 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
               </CardContent>
             </Card>
 
-            {/* Sección 2: Contacto y Rol */}
-            <Card sx={{ mb: 3, borderRadius: 2, boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
+            <Card className="section-card">
               <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" fontWeight={600} gutterBottom sx={{ color: '#374151', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="h6" fontWeight={600} gutterBottom className="section-title">
                   Contacto y Rol
                 </Typography>
-                <Grid container spacing={3}>
+                <Grid container spacing={3} className="form-grid">
                   <Grid item xs={12} md={6}>
                     <TextField 
                       fullWidth 
@@ -298,7 +271,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                       required 
                       disabled={loading} 
                       inputProps={{ maxLength: 8 }}
-                      variant="outlined"
+                      className="text-field"
                       size="medium"
                     />
                   </Grid>
@@ -312,6 +285,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                       onChange={(_, newValue) => handleChange("rol", newValue || roles[0])}
                       isOptionEqualToValue={(option, value) => option === value}
                       getOptionLabel={(option) => option || ""}
+                      className="autocomplete-container"
                       renderInput={(params) => (
                         <TextField
                           {...params}
@@ -319,7 +293,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                           required
                           error={formTouched && !form.rol}
                           helperText={formTouched && !form.rol ? "Campo requerido" : "Seleccione el rol correspondiente"}
-                          variant="outlined"
+                          className="text-field"
                           size="medium"
                         />
                       )}
@@ -342,7 +316,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                       }
                       required 
                       disabled={loading}
-                      variant="outlined"
+                      className="text-field"
                       size="medium"
                     />
                   </Grid>
@@ -350,13 +324,12 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
               </CardContent>
             </Card>
 
-            {/* Sección 3: Credenciales de Acceso */}
-            <Card sx={{ mb: 3, borderRadius: 2, boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
+            <Card className="section-card">
               <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" fontWeight={600} gutterBottom sx={{ color: '#374151', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="h6" fontWeight={600} gutterBottom className="section-title">
                   Credenciales de Acceso
                 </Typography>
-                <Grid container spacing={3}>
+                <Grid container spacing={3} className="form-grid">
                   <Grid item xs={12} md={6}>
                     <TextField 
                       fullWidth 
@@ -374,7 +347,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                       required 
                       disabled={loading || isEdit} 
                       InputProps={{ readOnly: isEdit }}
-                      variant="outlined"
+                      className={`text-field ${isEdit ? 'readonly-field' : ''}`}
                       size="medium"
                     />
                   </Grid>
@@ -392,7 +365,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                         required 
                         disabled={loading} 
                         InputProps={{ readOnly: true }}
-                        variant="outlined"
+                        className="text-field readonly-field"
                         size="medium"
                       />
                     </Grid>
@@ -401,13 +374,12 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
               </CardContent>
             </Card>
 
-            {/* Sección 4: Información Adicional */}
-            <Card sx={{ borderRadius: 2, boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
+            <Card className="section-card">
               <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" fontWeight={600} gutterBottom sx={{ color: '#374151', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="h6" fontWeight={600} gutterBottom className="section-title">
                   Información Adicional
                 </Typography>
-                <Grid container spacing={3}>
+                <Grid container spacing={3} className="form-grid">
                   <Grid item xs={12}>
                     <TextField 
                       fullWidth 
@@ -416,7 +388,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                       onChange={(e) => handleChange("urlImagen", e.target.value)}
                       disabled={loading} 
                       helperText="Opcional - Enlace a la foto del empleado"
-                      variant="outlined"
+                      className="text-field"
                       size="medium"
                     />
                   </Grid>
@@ -424,17 +396,16 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
               </CardContent>
             </Card>
 
-            {/* Mensajes de estado */}
             {formError && (
-              <Alert severity="error" sx={{ mt: 3, borderRadius: 2 }}>
-                <Typography variant="body2" fontWeight={500}>
+              <Alert severity="error" className="alert-message">
+                <Typography variant="body2" fontWeight={500} className="alert-text">
                   {formError}
                 </Typography>
               </Alert>
             )}
 
             {!initialData && (
-              <Alert severity="info" sx={{ mt: 3, borderRadius: 2 }}>
+              <Alert severity="info" className="info-alert">
                 <Typography variant="body2">
                   <strong>Información importante:</strong> El usuario y contraseña se generan automáticamente en base a los datos personales ingresados.
                 </Typography>
@@ -444,24 +415,12 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
         </Box>
       </DialogContent>
 
-      <DialogActions sx={{ 
-        px: 3, 
-        py: 2, 
-        gap: 2,
-        borderTop: '1px solid',
-        borderColor: 'divider',
-        bgcolor: '#f8fafc'
-      }}>
+      <DialogActions className="dialog-actions">
         <Button 
           onClick={onClose} 
           variant="outlined" 
           disabled={loading}
-          sx={{ 
-            minWidth: 120,
-            borderRadius: 2,
-            fontWeight: 600,
-            py: 1
-          }}
+          className="cancel-button"
         >
           Cancelar
         </Button>
@@ -470,16 +429,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
           form={FORM_ID} 
           variant="contained" 
           disabled={loading} 
-          sx={{ 
-            minWidth: 140,
-            borderRadius: 2,
-            fontWeight: 600,
-            py: 1,
-            background: 'linear-gradient(135deg, #9a9240ff 0%, #6a562aff 100%)',
-            '&:hover': {
-              background: 'linear-gradient(135deg, #9a9240ff 0%, #6a562aff 100%)',
-            }
-          }}
+          className="submit-button"
         >
           {loading ? "Guardando..." : "Guardar"}
         </Button>

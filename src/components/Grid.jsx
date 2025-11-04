@@ -4,6 +4,7 @@ import {
   useContext,
   forwardRef,
   useImperativeHandle,
+  useRef,
 } from "react";
 import DataTable from "react-data-table-component";
 import "@/context/dataTableTheme";
@@ -11,6 +12,7 @@ import { ThemeProviderContext } from "@/context/theme-context";
 import { customStylesLight, customStylesDark } from "./gridStyles";
 import { TextField, InputAdornment, Box, Typography } from "@mui/material";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
+import BarcodeListener from "./BarcodeListener"; // 💡 integración del lector
 
 const GridGenerico = forwardRef(
   (
@@ -29,6 +31,8 @@ const GridGenerico = forwardRef(
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
 
+    const searchInputRef = useRef(null); // 💡 ref del buscador
+
     const { theme } = useContext(ThemeProviderContext);
     const isDarkMode =
       theme === "dark" ||
@@ -36,6 +40,7 @@ const GridGenerico = forwardRef(
         window.matchMedia("(prefers-color-scheme: dark)").matches);
     const activeStyles = isDarkMode ? customStylesDark : customStylesLight;
 
+    // 🔹 Obtener datos desde el servicio
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -58,6 +63,7 @@ const GridGenerico = forwardRef(
       fetchData();
     }, []);
 
+    // 🔹 Filtro dinámico por texto o código escaneado
     useEffect(() => {
       if (!search) {
         setFilteredData(allData);
@@ -80,6 +86,16 @@ const GridGenerico = forwardRef(
       setFilteredData(filtered);
     }, [search, allData]);
 
+    // 🔹 Manejo de escaneo desde lector
+    const handleBarcodeScan = (code) => {
+      setSearch(code);
+      if (searchInputRef.current) {
+        searchInputRef.current.focus();
+        searchInputRef.current.select?.();
+      }
+    };
+
+    // 🔹 Columnas con acciones
     const columnsWithActions = [
       ...columns.map((c) => ({
         ...c,
@@ -108,7 +124,16 @@ const GridGenerico = forwardRef(
 
     return (
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
-        {/* 🔍 HEADER CON BUSCADOR CENTRADO */}
+        {/* 💡 Escucha el lector de códigos (activo incluso sin foco) */}
+        <BarcodeListener
+          onScan={handleBarcodeScan}
+          targetRef={searchInputRef}
+          enabled={enableSearch}
+          autoLength={13}
+          debug={false}
+        />
+
+        {/* 🔍 HEADER CON BUSCADOR */}
         {enableSearch && (
           <Box
             sx={{
@@ -135,6 +160,7 @@ const GridGenerico = forwardRef(
             </Typography>
 
             <TextField
+              inputRef={searchInputRef} // 💡 conectamos el ref
               variant="outlined"
               placeholder="Buscar..."
               value={search}

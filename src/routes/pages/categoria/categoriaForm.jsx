@@ -16,16 +16,28 @@ import ServiceCategoria from "@/services/ServiceCategoria";
 
 const CategoriaForm = ({ onClose, onSuccess, initialData = null }) => {
   const [form, setForm] = useState({
-    nombre: initialData?.nombre || "",
+    nombre: "",
+  });
+
+  const [touched, setTouched] = useState({
+    nombre: false,
   });
 
   const [formError, setFormError] = useState("");
-  const [formTouched, setFormTouched] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const regexNombre = /^[A-Za-zÁÉÍÓÚáéíóúÑñ0-9 .-]+$/;
+
   const handleChange = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-    setFormTouched(true);
+    let newVal = value;
+
+    if (field === "nombre") {
+      // solo letras, números, espacios y .-
+      newVal = newVal.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ0-9 .-]/g, "");
+    }
+
+    setForm((prev) => ({ ...prev, [field]: newVal }));
+    setTouched((prev) => ({ ...prev, [field]: true }));
   };
 
   const validateForm = () => {
@@ -33,13 +45,19 @@ const CategoriaForm = ({ onClose, onSuccess, initialData = null }) => {
       setFormError("Por favor complete el nombre de la categoría");
       return false;
     }
+
+    if (!regexNombre.test(form.nombre)) {
+      setFormError("El nombre no debe tener caracteres especiales");
+      return false;
+    }
+
     return true;
   };
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     setFormError("");
-    setFormTouched(true);
+    setTouched({ nombre: true });
 
     if (!validateForm()) return;
 
@@ -57,7 +75,10 @@ const CategoriaForm = ({ onClose, onSuccess, initialData = null }) => {
       onClose?.();
     } catch (err) {
       console.error("Error submitting categoría form:", err);
-      const msg = err.response?.data?.detail || err.message || "Error al procesar la categoría";
+      const msg =
+        err.response?.data?.detail ||
+        err.message ||
+        "Error al procesar la categoría";
       setFormError(msg);
       toast.error(msg);
     } finally {
@@ -70,34 +91,56 @@ const CategoriaForm = ({ onClose, onSuccess, initialData = null }) => {
       nombre: initialData?.nombre || "",
     });
     setFormError("");
-    setFormTouched(false);
+    setTouched({ nombre: false });
   }, [initialData]);
 
   return (
     <Dialog
-      open={true}
+      open={true} // en tu lista real cambialo a open={open}
       onClose={onClose}
       maxWidth="sm"
       fullWidth
-      PaperProps={{ sx: { borderRadius: 2 } }}
+      PaperProps={{
+        sx: {
+          borderRadius: 2,
+          overflow: "visible", // 👈 evita que se recorte el contenido
+        },
+      }}
     >
-      <DialogTitle sx={{ borderBottom: "1px solid", borderColor: "divider", pb: 2 }}>
+      <DialogTitle
+        sx={{ borderBottom: "1px solid", borderColor: "divider", pb: 2 }}
+      >
         <Typography variant="h6" fontWeight={600}>
           {initialData ? "Editar Categoría" : "Nueva Categoría"}
         </Typography>
       </DialogTitle>
 
-      <DialogContent sx={{ py: 3 }}>
+      <DialogContent
+        sx={{
+          py: 3,
+          overflow: "visible",
+          maxHeight: "60vh", // 👈 si el modal crece, scroll interno
+        }}
+      >
         <Box component="form" onSubmit={handleSubmit} noValidate>
-          <Grid container spacing={3}>
+          <Grid container spacing={2}>
             <Grid item xs={12}>
               <TextField
                 fullWidth
                 label="Nombre"
                 value={form.nombre}
                 onChange={(e) => handleChange("nombre", e.target.value)}
-                error={formTouched && !form.nombre?.trim()}
-                helperText={formTouched && !form.nombre?.trim() ? "Campo requerido" : ""}
+                error={
+                  touched.nombre &&
+                  (!form.nombre?.trim() || !regexNombre.test(form.nombre))
+                }
+                helperText={
+                  touched.nombre && !form.nombre?.trim()
+                    ? "Campo requerido"
+                    : touched.nombre && !regexNombre.test(form.nombre)
+                    ? "No se permiten caracteres especiales"
+                    : ""
+                }
                 required
                 disabled={loading}
               />

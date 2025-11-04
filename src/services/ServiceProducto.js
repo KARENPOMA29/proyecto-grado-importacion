@@ -1,10 +1,11 @@
 import api from "./api";
+
 const BASE = "/productos";
 
 // Crear un nuevo producto
 const create = async (payload) => (await api.post(`${BASE}/`, payload)).data;
 
-// Obtener todos los productos (usa params si el backend los soporta)
+// Obtener todos los productos
 const getAll = async (params = {}) => {
   const { data } = await api.get(`${BASE}/`, { params });
   // tu backend devuelve lista simple []
@@ -16,6 +17,8 @@ const getById = async (id) => {
   const { data } = await api.get(`${BASE}/${id}`);
   return data;
 };
+
+// Obtener solo disponibles
 const getDisponibles = async () => {
   const { data } = await api.get(`${BASE}/`, {
     params: { estado: 1 },
@@ -23,5 +26,20 @@ const getDisponibles = async () => {
   return Array.isArray(data) ? data : data.items || [];
 };
 
-const ServiceProducto = { create, getAll, getById, getDisponibles };
+// 👇 NUEVO: obtener por número de serie
+const getBySerie = async (serie) => {
+  const { data } = await api.get(`${BASE}/by-serie/${serie}`);
+  return data; // será null si no existe
+};
+const update = async (id, payload) => (await api.put(`${BASE}/${id}`, payload)).data;
+
+
+const ServiceProducto = {
+  create,
+  getAll,
+  getById,
+  getDisponibles,
+  getBySerie, update, // 👈 no olvides exportarlo
+};
+
 export default ServiceProducto;

@@ -14,7 +14,8 @@ export const adminMenu = [
   { label: "Resumen", icon: DashboardIcon, to: "/admin", group: "Principal" },
   { label: "Ventas", icon: ShoppingCartIcon, to: "/admin/ventas", group: "Principal" },
   { label: "Importaciones", icon: LocalShippingIcon, to: "/admin/importaciones", group: "Principal" },
-  { label: "Inventario", icon: InventoryIcon, to: "/admin/inventario", group: "Principal" },
+  { label: "Entradas", icon: InventoryIcon, to: "/admin/inventario", group: "Principal" },
+  { label: "Productos", icon: InventoryIcon, to: "/admin/productos", group: "Principal" },
 
   // GESTIÓN
   { label: "Clientes", icon: GroupIcon, to: "/admin/clientes", group: "Gestión" },
@@ -60,7 +61,7 @@ export const pilotoMenu = [
 export const almacenMenu = [
   // PRINCIPAL
   { label: "Resumen", icon: DashboardIcon, to: "/almacen", group: "Principal" },
-  { label: "Inventario", icon: InventoryIcon, to: "/almacen/inventario", group: "Principal" },
+  { label: "Entradas", icon: InventoryIcon, to: "/almacen/inventario", group: "Principal" },
   { label: "Importaciones", icon: LocalShippingIcon, to: "/almacen/importaciones", group: "Principal" },
 
   // GESTIÓN
