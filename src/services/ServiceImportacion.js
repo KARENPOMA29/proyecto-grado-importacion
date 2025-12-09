@@ -23,13 +23,14 @@ function toISODate(value) {
 function parseFastAPIErr(err) {
   const detail = err?.response?.data?.detail;
   if (Array.isArray(detail)) {
-    return detail.map((e) => `${(e.loc || []).join(".")}: ${e.msg}`).join(" | ");
+    return detail
+      .map((e) => `${(e.loc || []).join(".")}: ${e.msg}`)
+      .join(" | ");
   }
   if (typeof detail === "string") return detail;
   return err?.message || "Error al procesar importación";
 }
 
-// 👇 helper para obtener el usuario logueado
 function getCurrentUser() {
   try {
     const raw = localStorage.getItem("user");
@@ -51,27 +52,36 @@ const getById = async (id) => {
 
 const create = async (payload) => {
   try {
-    const user = getCurrentUser();            // 👈 aquí
-    const empleadoId = user?.id;              // 👈 tu backend devolvió "id"
+    const user = getCurrentUser();
+    const empleadoId = payload.empleadoId || user?.id; // por si se lo pasan
+    const idEmpleadoAsignado = payload.idEmpleadoAsignado;
 
     const clean = {
       codigo: String(payload.codigo ?? "").trim(),
       proveedorId: Number(payload.proveedorId),
       fechaLlegada: toISODate(payload.fechaLlegada),
-      estado: payload.estado || "En tránsito",
-      observaciones: payload.observaciones?.trim() || null,
-      empleadoId: Number(empleadoId),         // 👈 lo mandamos siempre
+      estado: 1, // 👈 entero, activo
+      descripcion: payload.descripcion?.trim() || null,
+      empleadoId: Number(empleadoId),
+      idEmpleadoAsignado: Number(idEmpleadoAsignado),
     };
 
     if (!clean.codigo) throw new Error("El código es requerido");
     if (!clean.proveedorId) throw new Error("El proveedor es requerido");
-    if (!clean.empleadoId) throw new Error("No hay usuario logueado (empleadoId)");
-    if (!clean.fechaLlegada) throw new Error("La fecha de llegada es requerida");
+    if (!clean.empleadoId)
+      throw new Error("No hay usuario logueado (empleadoId)");
+    if (!clean.fechaLlegada)
+      throw new Error("La fecha de llegada es requerida");
+    if (!clean.idEmpleadoAsignado)
+      throw new Error("El empleado asignado es requerido");
 
     const res = await api.post(`${BASE}/`, clean);
     return res.data;
   } catch (err) {
-    console.error("❌ Error creando importación. Respuesta:", err?.response?.data);
+    console.error(
+      "❌ Error creando importación. Respuesta:",
+      err?.response?.data
+    );
     throw new Error(parseFastAPIErr(err));
   }
 };
@@ -79,15 +89,26 @@ const create = async (payload) => {
 const update = async (id, payload) => {
   try {
     const clean = {
-      proveedorId: payload.proveedorId ? Number(payload.proveedorId) : undefined,
-      fechaLlegada: payload.fechaLlegada ? toISODate(payload.fechaLlegada) : undefined,
-      estado: payload.estado ?? undefined,
-      observaciones: payload.observaciones?.trim?.() ?? undefined,
+      proveedorId: payload.proveedorId
+        ? Number(payload.proveedorId)
+        : undefined,
+      fechaLlegada: payload.fechaLlegada
+        ? toISODate(payload.fechaLlegada)
+        : undefined,
+      descripcion: payload.descripcion?.trim?.() ?? undefined,
+      idEmpleadoAsignado: payload.idEmpleadoAsignado
+        ? Number(payload.idEmpleadoAsignado)
+        : undefined,
+      // si más adelante dejas editar estado, aquí se puede mandar
     };
+
     const res = await api.put(`${BASE}/${id}`, clean);
     return res.data;
   } catch (err) {
-    console.error("❌ Error actualizando importación. Respuesta:", err?.response?.data);
+    console.error(
+      "❌ Error actualizando importación. Respuesta:",
+      err?.response?.data
+    );
     throw new Error(parseFastAPIErr(err));
   }
 };
@@ -96,6 +117,10 @@ const remove = async (id) => {
   const { data } = await api.delete(`${BASE}/${id}`);
   return data;
 };
+const getByEmpleado = async (empleadoId) => {
+  const { data } = await api.get(`${BASE}/empleado/${empleadoId}`);
+  return Array.isArray(data) ? data : data.items || data;
+};
 
-const ServiceImportacion = { getAll, getById, create, update, remove };
+const ServiceImportacion = { getAll, getById, create, update, remove, getByEmpleado };
 export default ServiceImportacion;

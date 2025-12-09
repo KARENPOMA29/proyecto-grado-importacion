@@ -3,6 +3,8 @@ import api from "./api";
 export const login = async (credentials) => {
   try {
     const response = await api.post(`/auth/login`, credentials);
+    console.log("LOGIN RESPONSE DATA ===>", response.data); // 👈
+
     if (response.data) {
       localStorage.setItem("user", JSON.stringify(response.data));
     }

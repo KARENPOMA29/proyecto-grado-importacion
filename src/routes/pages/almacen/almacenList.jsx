@@ -51,16 +51,11 @@ const AlmacenList = () => {
       selector: (r) => sucursalMap[r.sucursalId] ?? "—",
       minWidth: "180px",
     },
-    {
-      name: "Registrado",
-      selector: (r) =>
-        r.fechaRegistro ? new Date(r.fechaRegistro).toLocaleString() : "—",
-      minWidth: "200px",
-    },
   ];
 
   const fields = [
     { label: "Nombre", key: "nombre" },
+    { label: "Dirección", key: "direccion" },
     {
       label: "Sucursal",
       key: "sucursalId",

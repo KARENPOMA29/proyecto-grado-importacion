@@ -1,25 +1,40 @@
-// src/pages/importaciones/ImportacionForm.jsx
 import { useState, useEffect } from "react";
+import { toast } from "react-toastify";
 import {
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Grid, Button, Typography, Alert, FormControl,
-  InputLabel, Select, MenuItem
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Grid,
+  Button,
+  Typography,
+  Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import ServiceImportacion from "@/services/ServiceImportacion";
 import ServiceProveedor from "@/services/ServiceProveedor";
+import ServiceEmpleado from "@/services/ServiceEmpleado";
 
-const ESTADOS = ["En tránsito", "En aduana", "Entregado"];
-
-export default function ImportacionForm({ open, onClose, initialData = null, onSuccess }) {
+export default function ImportacionForm({
+  open,
+  onClose,
+  initialData = null,
+  onSuccess,
+}) {
   const [form, setForm] = useState({
     codigo: "",
     proveedorId: "",
     fechaLlegada: "",
-    estado: "En tránsito",
-    observaciones: "",
-    empleadoId: "",
+    descripcion: "",
+    idEmpleadoAsignado: "",
   });
+
   const [proveedores, setProveedores] = useState([]);
+  const [empleados, setEmpleados] = useState([]); // solo piloteros
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -28,7 +43,7 @@ export default function ImportacionForm({ open, onClose, initialData = null, onS
     (async () => {
       try {
         const res = await ServiceProveedor.getAll();
-        const provs = Array.isArray(res) ? res : (res.items || []);
+        const provs = Array.isArray(res) ? res : res.items || [];
         setProveedores(provs);
       } catch (e) {
         console.error("Error cargando proveedores:", e);
@@ -36,22 +51,56 @@ export default function ImportacionForm({ open, onClose, initialData = null, onS
     })();
   }, []);
 
+  // cargar empleados (solo rol pilotero)
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await ServiceEmpleado.getAll();
+        const emps = Array.isArray(res) ? res : res.items || [];
+
+        console.log("👀 Empleados recibidos:", emps);
+
+        const piloteros = emps.filter((emp) => {
+          const rawRol =
+            (
+              emp.rol ??
+              emp.role ??
+              emp.nombreRol ??
+              emp.rolNombre ??
+              emp.tipoRol ??
+              emp.perfil?.rol ??
+              emp.perfil?.nombre ??
+              ""
+            )
+              .toString()
+              .trim()
+              .toLowerCase();
+
+          return rawRol.includes("pilotero");
+        });
+
+        console.log("✅ Empleados filtrados (pilotero):", piloteros);
+        setEmpleados(piloteros);
+      } catch (e) {
+        console.error("Error cargando empleados:", e);
+      }
+    })();
+  }, []);
+
   // cargar datos en edición
   useEffect(() => {
     setForm({
-      codigo:        initialData?.codigo || "",
-      proveedorId:   initialData?.proveedorId || "",
-      fechaLlegada:  initialData?.fechaLlegada?.slice?.(0, 10) || "",
-      estado:        initialData?.estado || "En tránsito",
-      observaciones: initialData?.observaciones || "",
-      empleadoId:    initialData?.empleadoId || "",
+      codigo: initialData?.codigo || "",
+      proveedorId: initialData?.proveedorId || "",
+      fechaLlegada: initialData?.fechaLlegada?.slice?.(0, 10) || "",
+      descripcion: initialData?.descripcion || "",
+      idEmpleadoAsignado: initialData?.idEmpleadoAsignado || "",
     });
     setErr("");
   }, [initialData]);
 
   const handle = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
-  // 🔒 validación de fecha > hoy
   const esFechaPosteriorAHoy = (fechaStr) => {
     if (!fechaStr) return false;
     const hoy = new Date();
@@ -66,21 +115,23 @@ export default function ImportacionForm({ open, onClose, initialData = null, onS
 
     const proveedorIdNum = parseInt(form.proveedorId, 10);
     if (!form.codigo?.trim()) return setErr("El código es obligatorio");
-    if (!Number.isFinite(proveedorIdNum)) return setErr("Seleccione un proveedor válido");
-    if (!form.fechaLlegada) return setErr("La fecha de llegada es obligatoria");
-
-    // 👉 validación nueva
+    if (!Number.isFinite(proveedorIdNum))
+      return setErr("Seleccione un proveedor válido");
+    if (!form.fechaLlegada)
+      return setErr("La fecha de llegada es obligatoria");
     if (!esFechaPosteriorAHoy(form.fechaLlegada)) {
       return setErr("La fecha de llegada debe ser posterior a la fecha de hoy.");
+    }
+    if (!form.idEmpleadoAsignado) {
+      return setErr("Debe seleccionar el empleado asignado a la importación.");
     }
 
     const payload = {
       codigo: form.codigo.trim(),
       proveedorId: Number(form.proveedorId),
       fechaLlegada: form.fechaLlegada,
-      estado: form.estado,
-      observaciones: form.observaciones?.trim() || null,
-      empleadoId: Number(form.empleadoId),
+      descripcion: form.descripcion?.trim() || null,
+      idEmpleadoAsignado: Number(form.idEmpleadoAsignado),
     };
 
     setLoading(true);
@@ -90,12 +141,28 @@ export default function ImportacionForm({ open, onClose, initialData = null, onS
         : await ServiceImportacion.create(payload);
 
       onSuccess?.(data);
-      onClose?.();
+      if (!initialData)
+        toast.success("Importación registrada correctamente");
+      return data;
     } catch (e) {
+      console.error("Error guardando importación:", e);
       setErr(e.message || "Error guardando importación");
     } finally {
       setLoading(false);
     }
+  };
+
+  // CI + nombre para mostrar en el combo
+  const renderEmpleadoLabel = (emp) => {
+    const ci =
+      emp.ci ?? emp.ciNit ?? emp.documento ?? emp.numeroDocumento ?? "";
+    const nombreCompleto =
+      emp.nombre ??
+      [emp.nombres, emp.apellidos].filter(Boolean).join(" ") ??
+      "";
+    if (ci && nombreCompleto) return `${ci} - ${nombreCompleto}`;
+    if (nombreCompleto) return nombreCompleto;
+    return `ID ${emp.id}`;
   };
 
   return (
@@ -106,13 +173,14 @@ export default function ImportacionForm({ open, onClose, initialData = null, onS
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 3,
+          borderRadius: 2,
           overflow: "visible",
-          p: 1,
         },
       }}
     >
-      <DialogTitle component="div">
+      <DialogTitle
+        sx={{ borderBottom: "1px solid", borderColor: "divider", pb: 2 }}
+      >
         <Typography variant="h6" fontWeight={600}>
           {initialData ? "Editar Importación" : "Nueva Importación"}
         </Typography>
@@ -120,9 +188,9 @@ export default function ImportacionForm({ open, onClose, initialData = null, onS
 
       <DialogContent
         sx={{
-          pt: 2,
-          pb: 1,
+          py: 3,
           overflow: "visible",
+          maxHeight: "70vh",
         }}
       >
         <Grid container spacing={2}>
@@ -138,13 +206,16 @@ export default function ImportacionForm({ open, onClose, initialData = null, onS
             />
           </Grid>
 
-          {/* PROVEEDOR (combo arreglado) */}
+          {/* PROVEEDOR */}
           <Grid item xs={12} sm={6} md={4}>
             <FormControl
               fullWidth
               required
               disabled={loading}
-              sx={{ overflow: "visible" }}
+              sx={{
+                overflow: "visible",
+                "& .MuiInputBase-root": { minHeight: 56 }, // combo más grande
+              }}
             >
               <InputLabel id="proveedor-label">Proveedor</InputLabel>
               <Select
@@ -157,6 +228,11 @@ export default function ImportacionForm({ open, onClose, initialData = null, onS
                     zIndex: 2000,
                   },
                 }}
+                sx={{
+                  "& .MuiSelect-select": {
+                    py: 1.5, // más alto
+                  },
+                }}
               >
                 {proveedores.map((p) => (
                   <MenuItem key={p.id} value={p.id}>
@@ -167,7 +243,7 @@ export default function ImportacionForm({ open, onClose, initialData = null, onS
             </FormControl>
           </Grid>
 
-          {/* FECHA LLEGADA (con picker) */}
+          {/* FECHA LLEGADA */}
           <Grid item xs={12} sm={6} md={4}>
             <TextField
               label="Fecha de llegada"
@@ -178,57 +254,83 @@ export default function ImportacionForm({ open, onClose, initialData = null, onS
               onChange={(e) => handle("fechaLlegada", e.target.value)}
               disabled={loading}
               inputProps={{
-                min: new Date().toISOString().slice(0, 10), // también en el input
+                min: new Date().toISOString().slice(0, 10),
               }}
             />
           </Grid>
 
-          {/* ESTADO */}
-          <Grid item xs={12} sm={6} md={4}>
-            <FormControl fullWidth disabled={loading}>
-              <InputLabel id="estado-label">Estado</InputLabel>
+          {/* EMPLEADO ASIGNADO (solo piloteros) */}
+          <Grid item xs={12} sm={6} md={6}>
+            <FormControl
+              fullWidth
+              required
+              disabled={loading}
+              sx={{
+                overflow: "visible",
+                "& .MuiInputBase-root": { minHeight: 56 }, // combo más grande
+              }}
+            >
+              <InputLabel id="empleado-asignado-label">
+                Empleado asignado (Pilotero)
+              </InputLabel>
               <Select
-                labelId="estado-label"
-                label="Estado"
-                value={form.estado}
-                onChange={(e) => handle("estado", e.target.value)}
-                MenuProps={{ sx: { zIndex: 2000 } }}
+                labelId="empleado-asignado-label"
+                label="Empleado asignado (Pilotero)"
+                value={form.idEmpleadoAsignado ?? ""}
+                onChange={(e) =>
+                  handle("idEmpleadoAsignado", e.target.value)
+                }
+                MenuProps={{
+                  sx: {
+                    zIndex: 2000,
+                  },
+                }}
+                sx={{
+                  "& .MuiSelect-select": {
+                    py: 1.5,
+                  },
+                }}
               >
-                {ESTADOS.map((st) => (
-                  <MenuItem key={st} value={st}>
-                    {st}
+                {empleados.map((emp) => (
+                  <MenuItem key={emp.id} value={emp.id}>
+                    {renderEmpleadoLabel(emp)}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
           </Grid>
 
-          {/* OBSERVACIONES */}
-          <Grid item xs={12} md={8}>
+          {/* DESCRIPCIÓN */}
+          <Grid item xs={12}>
             <TextField
-              label="Observaciones"
+              label="Descripción"
               fullWidth
               multiline
               rows={3}
-              value={form.observaciones}
-              onChange={(e) => handle("observaciones", e.target.value)}
+              value={form.descripcion}
+              onChange={(e) => handle("descripcion", e.target.value)}
               disabled={loading}
             />
           </Grid>
         </Grid>
 
         {err && (
-          <Alert severity="error" sx={{ mt: 2, whiteSpace: "pre-wrap" }}>
+          <Alert severity="error" sx={{ mt: 3, whiteSpace: "pre-wrap" }}>
             {err}
           </Alert>
         )}
       </DialogContent>
 
-      <DialogActions sx={{ p: 2 }}>
-        <Button variant="outlined" onClick={onClose} disabled={loading}>
+      <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
+        <Button onClick={onClose} variant="outlined" disabled={loading}>
           Cancelar
         </Button>
-        <Button variant="contained" onClick={submit} disabled={loading}>
+        <Button
+          onClick={submit}
+          variant="contained"
+          disabled={loading}
+          sx={{ minWidth: 120 }}
+        >
           {loading ? "Guardando..." : "Guardar"}
         </Button>
       </DialogActions>

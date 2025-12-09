@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { PencilLine, Trash, Eye, Users } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { PencilLine, Trash, Eye } from "lucide-react";
 import GridGenerico from "@/components/Grid";
 import DetailsDialog from "@/components/details";
 import DeleteConfirm from "@/components/deleteConfirm";
@@ -7,15 +7,16 @@ import EmpleadoForm from "./EmpleadoForm";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "react-toastify";
 import ServiceEmpleado from "@/services/ServiceEmpleado";
+import ServiceSucursal from "@/services/ServiceSucursal";
 
 const IconBtn = ({ title, className = "", children, ...props }) => (
- <button
+  <button
     title={title}
     className={`inline-flex items-center justify-center h-9 w-9 rounded-lg transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#592B2B]/30 ${className}`}
     {...props}
   >
     {children}
-  </button> 
+  </button>
 );
 
 const EmpleadoList = () => {
@@ -23,15 +24,46 @@ const EmpleadoList = () => {
   const [idToDelete, setIdToDelete] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState(null);
+  const [sucursales, setSucursales] = useState([]);
+
   const gridRef = useRef(null);
   const { user } = useAuth();
   const isAdmin = user?.rol === "Administrador";
+
+  // 🔄 Cargar sucursales para mostrar el nombre
+  useEffect(() => {
+    const fetchSucursales = async () => {
+      try {
+        const res = await ServiceSucursal.getAll();
+        const items = Array.isArray(res) ? res : res.items || [];
+        setSucursales(items);
+      } catch (err) {
+        console.error("Error cargando sucursales:", err);
+        toast.error("Error al cargar sucursales");
+      }
+    };
+    fetchSucursales();
+  }, []);
+
+  const getSucursalNombre = (idSucursal) => {
+    if (!idSucursal) return "—";
+    const idNum = Number(idSucursal);
+    const suc = sucursales.find((s) => s.id === idNum);
+    // 👇 ajusta "nombre" si tu modelo de sucursal tiene otra propiedad (ej: razonSocial)
+    return suc?.nombre || "—";
+  };
 
   const columns = [
     { name: "Nombre", selector: (r) => r.nombre, sortable: true, minWidth: "140px" },
     { name: "Apellido", selector: (r) => r.apellido, sortable: true, minWidth: "140px" },
     { name: "CI", selector: (r) => r.ci, sortable: true, minWidth: "110px" },
     { name: "Rol", selector: (r) => r.rol, sortable: true, minWidth: "140px" },
+    {
+      name: "Nombre",
+      selector: (r) => getSucursalNombre(r.idSucursal),
+      sortable: true,
+      minWidth: "160px",
+    },
     { name: "Teléfono", selector: (r) => r.telefono, sortable: true, minWidth: "140px" },
     { name: "Correo", selector: (r) => r.correo, sortable: true, minWidth: "220px", grow: 2 },
   ];
@@ -43,9 +75,18 @@ const EmpleadoList = () => {
     { label: "CI", key: "ci" },
     { label: "Teléfono", key: "telefono" },
     { label: "Rol", key: "rol" },
+    {
+      label: "Sucursal",
+      key: "idSucursal",
+      format: (id) => getSucursalNombre(id),
+    },
     { label: "Usuario", key: "usuario" },
     { label: "Correo", key: "correo" },
-    { label: "Fecha Registro", key: "fechaRegistro", format: (v) => new Date(v).toLocaleString() },
+    {
+      label: "Fecha Registro",
+      key: "fechaRegistro",
+      format: (v) => (v ? new Date(v).toLocaleString() : "—"),
+    },
   ];
 
   const handleDelete = async () => {
@@ -75,15 +116,12 @@ const EmpleadoList = () => {
       {/* HEADER */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
         <div className="flex items-center justify-between gap-4">
-          {/* IZQUIERDA: título */}
           <div className="flex items-start gap-3 flex-1">
-            
             <div>
               <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">
                 Gestión de Empleados
               </h1>
-              <p className="text-gray-600 text-sm mt-1">
-              </p>
+              <p className="text-gray-600 text-sm mt-1"></p>
             </div>
           </div>
           {isAdmin && (
@@ -99,11 +137,9 @@ const EmpleadoList = () => {
             </button>
           )}
         </div>
-        
       </div>
-      
 
-      {/* ESPACIO ENTRE BOTÓN Y GRID */}
+      {/* GRID */}
       <div className="mt-2 bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
         <GridGenerico
           ref={gridRef}

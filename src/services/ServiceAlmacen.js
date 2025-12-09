@@ -1,3 +1,4 @@
+// src/services/ServiceAlmacen.js
 import api from "./api";
 
 const BASE = "/almacenes";
@@ -6,11 +7,14 @@ const getAll = async (params = {}) => {
   try {
     const res = await api.get(`${BASE}/`, { params });
     const data = res.data;
-    // Normaliza para GridGenerico (igual que ServiceCliente/ServiceCategoria)
+    // Normaliza para GridGenerico
     if (Array.isArray(data)) return { items: data, total: data.length };
     return data;
   } catch (err) {
-    const message = err.response?.data?.detail || err.message || "Error al obtener almacenes";
+    const message =
+      err.response?.data?.detail ||
+      err.message ||
+      "Error al obtener almacenes";
     throw new Error(message);
   }
 };
@@ -20,17 +24,23 @@ const getById = async (id) => {
     const res = await api.get(`${BASE}/${id}`);
     return res.data;
   } catch (err) {
-    const message = err.response?.data?.detail || err.message || "Almacén no encontrado";
+    const message =
+      err.response?.data?.detail ||
+      err.message ||
+      "Almacén no encontrado";
     throw new Error(message);
   }
 };
 
 const create = async (payload) => {
   try {
-    const res = await api.post(`${BASE}/`, payload); // { nombre, sucursalId }
+    const res = await api.post(`${BASE}/`, payload); // { nombre, direccion, sucursalId }
     return res.data;
   } catch (err) {
-    const message = err.response?.data?.detail || err.message || "Error al crear almacén";
+    const message =
+      err.response?.data?.detail ||
+      err.message ||
+      "Error al crear almacén";
     throw new Error(message);
   }
 };
@@ -40,7 +50,10 @@ const update = async (id, payload) => {
     const res = await api.put(`${BASE}/${id}`, payload);
     return res.data;
   } catch (err) {
-    const message = err.response?.data?.detail || err.message || "Error al actualizar almacén";
+    const message =
+      err.response?.data?.detail ||
+      err.message ||
+      "Error al actualizar almacén";
     throw new Error(message);
   }
 };
@@ -50,10 +63,27 @@ const remove = async (id) => {
     const res = await api.delete(`${BASE}/${id}`);
     return res.data;
   } catch (err) {
-    const message = err.response?.data?.detail || err.message || "Error al eliminar almacén";
+    const message =
+      err.response?.data?.detail ||
+      err.message ||
+      "Error al eliminar almacén";
     throw new Error(message);
   }
 };
 
-const ServiceAlmacen = { getAll, getById, create, update, remove };
+// 👉 helper para filtrar por sucursal usando el mismo getAll
+const getBySucursal = async (sucursalId) => {
+  // esto termina llamando a /almacenes?sucursalId=123
+  return getAll({ sucursalId });
+};
+
+const ServiceAlmacen = {
+  getAll,
+  getById,
+  create,
+  update,
+  remove,
+  getBySucursal,
+};
+
 export default ServiceAlmacen;

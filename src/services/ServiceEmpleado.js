@@ -4,13 +4,29 @@ const BASE = '/empleados';
 
 const normalizeDetail = (detail) => {
   if (Array.isArray(detail)) {
-    // FastAPI 422: [{loc, msg, type}, ...]
-    return detail.map(d => d?.msg || d?.detail || JSON.stringify(d)).join(' | ');
+    return detail.map(d => d?.msg || d?.detail || JSON.stringify(d)).join(" | ");
   }
-  if (detail && typeof detail === 'object') {
+  if (detail && typeof detail === "object") {
     return detail.detail || detail.message || JSON.stringify(detail);
   }
-  return String(detail || 'Error desconocido');
+  return String(detail || "Error desconocido");
+};
+const uploadImagen = async (file) => {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await api.post(`${BASE}/upload-imagen`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    return res.data; // { urlImagen: "/archivos/empleados/xxxx.jpg" }
+  } catch (err) {
+    const detail = err.response?.data?.detail ?? err.response?.data ?? err.message;
+    throw new Error(normalizeDetail(detail) || "Error al subir la imagen");
+  }
 };
 
 const getAll = async (params = {}) => {
@@ -65,5 +81,5 @@ const remove = async (id) => {
   }
 };
 
-const ServiceEmpleado = { getAll, getById, create, update, remove };
+const ServiceEmpleado = { getAll, getById, create, update, remove, uploadImagen };
 export default ServiceEmpleado;

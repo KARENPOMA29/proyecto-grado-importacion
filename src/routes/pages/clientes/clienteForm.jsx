@@ -11,78 +11,137 @@ import {
   Typography,
   Alert,
   Grid,
+  CircularProgress,
 } from "@mui/material";
 import ServiceCliente from "@/services/ServiceCliente";
 
 const ClienteForm = ({ onClose, onSuccess, initialData = null }) => {
   const [form, setForm] = useState({
-    nombre: "",
-    apellido: "",
-    segundoApellido: "",
-    ci: "",
+    razonSocial: "",
+    nit: "",
     correo: "",
+    telefono: "",
   });
 
-  // 👇 touched por campo
   const [touched, setTouched] = useState({
-    nombre: false,
-    apellido: false,
-    segundoApellido: false,
-    ci: false,
+    razonSocial: false,
+    nit: false,
     correo: false,
+    telefono: false,
   });
 
   const [formError, setFormError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // regex para nombres (letras, espacios, tildes)
-  const regexNombre = /^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$/;
+  // 👇 estados específicos para NIT
+  const [checkingNit, setCheckingNit] = useState(false);
+  const [nitError, setNitError] = useState("");
+  const [nitExists, setNitExists] = useState(false);
 
   const handleChange = (field, value) => {
     let newValue = value;
 
-    if (field === "nombre" || field === "apellido" || field === "segundoApellido") {
-      // solo letras y espacios
-      newValue = newValue.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ ]/g, "");
-    }
-
-    if (field === "ci") {
-      newValue = newValue.replace(/\D/g, "");
+    if (field === "nit" || field === "telefono") {
+      newValue = newValue.replace(/\D/g, ""); // solo números
     }
 
     setForm((prev) => ({ ...prev, [field]: newValue }));
     setTouched((prev) => ({ ...prev, [field]: true }));
+
+    // Si cambia algo, limpiamos el error global
+    setFormError("");
   };
 
+  // 🧠 Debounce para verificar NIT en tiempo real sin parpadeo
+  useEffect(() => {
+    const nitValue = form.nit?.trim();
+
+    // reset rápido si está vacío o muy corto
+    if (!nitValue || nitValue.length < 3) {
+      setNitExists(false);
+      setNitError("");
+      setCheckingNit(false);
+      return;
+    }
+
+    // si estamos editando y el NIT no cambió, no verificar
+    if (initialData?.nit && nitValue === String(initialData.nit).trim()) {
+      setNitExists(false);
+      setNitError("");
+      setCheckingNit(false);
+      return;
+    }
+
+    let cancelado = false;
+
+    const timer = setTimeout(async () => {
+      try {
+        setCheckingNit(true);
+        // No tocamos formError aquí, solo nitError
+        const allClientes = await ServiceCliente.getAll();
+        const items = Array.isArray(allClientes)
+          ? allClientes
+          : allClientes.items || [];
+
+        const existe = items.some(
+          (cli) =>
+            String(cli.nit).trim() === nitValue &&
+            cli.estado === 1 &&
+            (!initialData || cli.id !== initialData.id)
+        );
+
+        if (!cancelado) {
+          setNitExists(existe);
+          setNitError(existe ? "Ya existe un cliente activo con este NIT" : "");
+        }
+      } catch (err) {
+        console.error("Error verificando NIT:", err);
+        if (!cancelado) {
+          setNitExists(false);
+          setNitError("");
+        }
+      } finally {
+        if (!cancelado) {
+          setCheckingNit(false);
+        }
+      }
+    }, 500); // ⏱ espera 500ms después de dejar de tipear
+
+    return () => {
+      cancelado = true;
+      clearTimeout(timer);
+    };
+  }, [form.nit, initialData]);
+
   const validateForm = () => {
-    if (!form.nombre || !form.apellido || !form.ci || !form.correo) {
+    if (!form.razonSocial || !form.nit || !form.correo || !form.telefono) {
       setFormError("Por favor complete todos los campos obligatorios");
       return false;
     }
 
-    if (!regexNombre.test(form.nombre)) {
-      setFormError("El nombre no debe tener caracteres especiales");
+    if (form.razonSocial.trim().length < 3) {
+      setFormError("La razón social debe tener al menos 3 caracteres");
       return false;
     }
 
-    if (!regexNombre.test(form.apellido)) {
-      setFormError("El apellido no debe tener caracteres especiales");
-      return false;
-    }
-
-    if (form.segundoApellido && !regexNombre.test(form.segundoApellido)) {
-      setFormError("El segundo apellido no debe tener caracteres especiales");
-      return false;
-    }
-
-    if (!/^\d{7,8}$/.test(form.ci)) {
-      setFormError("El CI debe tener 7 u 8 dígitos");
+    if (!/^\d{3,15}$/.test(form.nit)) {
+      setFormError("El NIT debe ser numérico (3 a 15 dígitos)");
       return false;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(form.correo)) {
       setFormError("Ingrese un correo electrónico válido");
+      return false;
+    }
+
+    if (!/^\d{7,8}$/.test(form.telefono)) {
+      setFormError("El teléfono debe tener 7 u 8 dígitos");
+      return false;
+    }
+
+    if (nitExists) {
+      setFormError("Ya existe un cliente activo con ese NIT.");
       return false;
     }
 
@@ -93,13 +152,11 @@ const ClienteForm = ({ onClose, onSuccess, initialData = null }) => {
     if (e) e.preventDefault();
     setFormError("");
 
-    // marcar todos tocados al enviar
     setTouched({
-      nombre: true,
-      apellido: true,
-      segundoApellido: true,
-      ci: true,
+      razonSocial: true,
+      nit: true,
       correo: true,
+      telefono: true,
     });
 
     if (!validateForm()) return;
@@ -107,6 +164,7 @@ const ClienteForm = ({ onClose, onSuccess, initialData = null }) => {
     setLoading(true);
     try {
       const payload = { ...form };
+
       if (initialData?.id) {
         await ServiceCliente.update(initialData.id, payload);
         toast.success("Cliente actualizado correctamente");
@@ -114,6 +172,7 @@ const ClienteForm = ({ onClose, onSuccess, initialData = null }) => {
         await ServiceCliente.create(payload);
         toast.success("Cliente creado correctamente");
       }
+
       onSuccess?.();
       onClose?.();
     } catch (err) {
@@ -129,32 +188,32 @@ const ClienteForm = ({ onClose, onSuccess, initialData = null }) => {
 
   useEffect(() => {
     setForm({
-      nombre: initialData?.nombre || "",
-      apellido: initialData?.apellido || "",
-      segundoApellido: initialData?.segundoApellido || "",
-      ci: initialData?.ci || "",
+      razonSocial: initialData?.razonSocial || "",
+      nit: initialData?.nit ? String(initialData.nit) : "",
       correo: initialData?.correo || "",
+      telefono: initialData?.telefono || "",
     });
     setFormError("");
+    setNitError("");
+    setNitExists(false);
     setTouched({
-      nombre: false,
-      apellido: false,
-      segundoApellido: false,
-      ci: false,
+      razonSocial: false,
+      nit: false,
       correo: false,
+      telefono: false,
     });
   }, [initialData]);
 
   return (
     <Dialog
-      open={true} // en tu listado lo cambias por open={open}
+      open={true}
       onClose={onClose}
       maxWidth="sm"
       fullWidth
       PaperProps={{
         sx: {
           borderRadius: 2,
-          overflow: "visible", // 👈 evita que se recorte el contenido
+          overflow: "visible",
         },
       }}
     >
@@ -170,23 +229,50 @@ const ClienteForm = ({ onClose, onSuccess, initialData = null }) => {
         sx={{
           py: 3,
           overflow: "visible",
-          maxHeight: "65vh", // 👈 si hay poco alto, que haga scroll adentro
+          maxHeight: "65vh",
         }}
       >
         <Box component="form" onSubmit={handleSubmit} noValidate>
           <Grid container spacing={2}>
+            {/* NIT primero */}
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="Nombre"
-                value={form.nombre}
-                onChange={(e) => handleChange("nombre", e.target.value)}
-                error={touched.nombre && (!form.nombre || !regexNombre.test(form.nombre))}
+                label="NIT"
+                value={form.nit}
+                onChange={(e) => handleChange("nit", e.target.value)}
+                error={
+                  touched.nit &&
+                  (!!nitError || !/^\d{3,15}$/.test(form.nit))
+                }
                 helperText={
-                  touched.nombre && !form.nombre
+                  nitError
+                    ? nitError
+                    : touched.nit && !/^\d{3,15}$/.test(form.nit)
+                    ? "Debe ser numérico (3 a 15 dígitos)"
+                    : ""
+                }
+                required
+                disabled={loading}
+                InputProps={{
+                  endAdornment: checkingNit ? (
+                    <CircularProgress size={20} />
+                  ) : null,
+                }}
+                inputProps={{ maxLength: 15 }}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Razón Social"
+                value={form.razonSocial}
+                onChange={(e) => handleChange("razonSocial", e.target.value)}
+                error={touched.razonSocial && !form.razonSocial}
+                helperText={
+                  touched.razonSocial && !form.razonSocial
                     ? "Campo requerido"
-                    : touched.nombre && !regexNombre.test(form.nombre)
-                    ? "Solo letras y espacios"
                     : ""
                 }
                 required
@@ -197,55 +283,12 @@ const ClienteForm = ({ onClose, onSuccess, initialData = null }) => {
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="Apellido"
-                value={form.apellido}
-                onChange={(e) => handleChange("apellido", e.target.value)}
-                error={
-                  touched.apellido && (!form.apellido || !regexNombre.test(form.apellido))
-                }
+                label="Teléfono"
+                value={form.telefono}
+                onChange={(e) => handleChange("telefono", e.target.value)}
+                error={touched.telefono && !/^\d{7,8}$/.test(form.telefono)}
                 helperText={
-                  touched.apellido && !form.apellido
-                    ? "Campo requerido"
-                    : touched.apellido && !regexNombre.test(form.apellido)
-                    ? "Solo letras y espacios"
-                    : ""
-                }
-                required
-                disabled={loading}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Segundo Apellido"
-                value={form.segundoApellido}
-                onChange={(e) => handleChange("segundoApellido", e.target.value)}
-                error={
-                  touched.segundoApellido &&
-                  form.segundoApellido &&
-                  !regexNombre.test(form.segundoApellido)
-                }
-                helperText={
-                  touched.segundoApellido &&
-                  form.segundoApellido &&
-                  !regexNombre.test(form.segundoApellido)
-                    ? "Solo letras y espacios"
-                    : "Opcional"
-                }
-                disabled={loading}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="CI"
-                value={form.ci}
-                onChange={(e) => handleChange("ci", e.target.value)}
-                error={touched.ci && (!form.ci || !/^\d{7,8}$/.test(form.ci))}
-                helperText={
-                  touched.ci && (!form.ci || !/^\d{7,8}$/.test(form.ci))
+                  touched.telefono && !/^\d{7,8}$/.test(form.telefono)
                     ? "Debe tener 7 u 8 dígitos"
                     : ""
                 }
@@ -255,7 +298,7 @@ const ClienteForm = ({ onClose, onSuccess, initialData = null }) => {
               />
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
                 type="email"
@@ -267,7 +310,8 @@ const ClienteForm = ({ onClose, onSuccess, initialData = null }) => {
                   (!form.correo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo))
                 }
                 helperText={
-                  touched.correo && (!form.correo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo))
+                  touched.correo &&
+                  (!form.correo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo))
                     ? "Ingrese un correo válido"
                     : ""
                 }
@@ -292,7 +336,7 @@ const ClienteForm = ({ onClose, onSuccess, initialData = null }) => {
         <Button
           onClick={handleSubmit}
           variant="contained"
-          disabled={loading}
+          disabled={loading || nitExists || checkingNit}
           sx={{ minWidth: 100 }}
         >
           {loading ? "Guardando..." : "Guardar"}

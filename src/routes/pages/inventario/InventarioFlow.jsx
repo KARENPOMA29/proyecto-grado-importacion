@@ -13,6 +13,11 @@ import {
   Card,
   IconButton,
   InputAdornment,
+  FormControl,
+  FormLabel,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
 } from "@mui/material";
 import { Check, X, Camera, Trash2, ChevronRight } from "lucide-react";
 
@@ -26,6 +31,8 @@ import ServiceMovimiento from "@/services/ServiceMovimiento";
 import { toast } from "react-toastify";
 import BarcodeListener from "@/components/BarcodeListener";
 import "./InventarioFlowMod.css";
+// 🔹 nuevo: leer usuario / rol
+import { useAuth } from "@/context/AuthContext";
 
 const STEP_TITLES = ["Sucursal", "Almacén", "Detalle", "Resumen"];
 
@@ -42,14 +49,17 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
   const [selCategoria, setSelCategoria] = useState(null);
   const [selModelo, setSelModelo] = useState(null);
   const [selImportacion, setSelImportacion] = useState(null);
+  const [precioOrigenLote, setPrecioOrigenLote] = useState("");
+  const [precioVentaLote, setPrecioVentaLote] = useState("");
+
   const [items, setItems] = useState([]);
   const [nuevo, setNuevo] = useState({
     numeroSerie: "",
     descripcion: "",
+    precioOrigen: "",
     precio: "",
-    color: "",
-    duracionGarantia: "",
-    tipoGarantia: "MES",
+    observado: 1, // 👈 por defecto “normal”
+    obsDescripcion: "", // 👈 detalle observación
   });
   const [serieValidando, setSerieValidando] = useState(false);
   const [serieOcupada, setSerieOcupada] = useState(false);
@@ -57,6 +67,15 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
   const [serieBloqueada, setSerieBloqueada] = useState(false);
   const serieInputRef = useRef(null);
 
+  // 🔹 info del usuario y rol
+  const { user } = useAuth();
+  const roleKey = (user?.rol || user?.role || "")
+    .toString()
+    .trim()
+    .toLowerCase();
+  const empleadoSucursalId = user?.idSucursal ?? null;
+
+  // Cargar catálogos base
   useEffect(() => {
     if (!isOpen) return;
     (async () => {
@@ -68,8 +87,10 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
           ServiceImportacion.getAll(),
         ]);
 
-        setSucursales(Array.isArray(s) ? s : s.items ?? []);
+        const sucData = Array.isArray(s) ? s : s.items ?? [];
+        setSucursales(sucData);
         setCategorias(Array.isArray(c) ? c : c.items ?? []);
+
         const mods = Array.isArray(m) ? m : m.items ?? [];
         setModelos(
           mods.map((mm) => ({
@@ -77,6 +98,7 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
             _nombre: mm.nombre ?? mm.nombreModelo ?? `Modelo #${mm.id}`,
           }))
         );
+
         setImportaciones(Array.isArray(imps) ? imps : imps.items ?? []);
       } catch (err) {
         console.warn("Error cargando catálogos:", err);
@@ -84,6 +106,27 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
     })();
   }, [isOpen]);
 
+  // 🔹 sucursal asignada al empleado (objeto)
+  const sucursalEmpleado = useMemo(() => {
+    if (!empleadoSucursalId) return null;
+    return (
+      sucursales.find(
+        (s) => Number(s.id) === Number(empleadoSucursalId || 0)
+      ) || null
+    );
+  }, [sucursales, empleadoSucursalId]);
+
+  // 🔹 cuando soy rol "almacen", autoseleccionar sucursal del usuario
+  useEffect(() => {
+    if (!isOpen) return;
+    if (roleKey !== "almacen") return;
+    if (!sucursalEmpleado) return;
+    if (!selSucursal || selSucursal.id !== sucursalEmpleado.id) {
+      setSelSucursal(sucursalEmpleado);
+    }
+  }, [isOpen, roleKey, sucursalEmpleado, selSucursal]);
+
+  // Cargar almacenes por sucursal
   useEffect(() => {
     (async () => {
       setSelAlmacen(null);
@@ -105,6 +148,7 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
     [step1OK, items]
   );
 
+  // Validar serie contra backend
   const validarSerieEnServidor = async (serie) => {
     if (!serie) {
       setSerieOcupada(false);
@@ -162,9 +206,8 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
       numeroSerie: "",
       descripcion: "",
       precio: "",
-      color: "",
-      duracionGarantia: "",
-      tipoGarantia: "MES",
+      observado: 1,
+      obsDescripcion: "",
     });
   };
 
@@ -216,15 +259,70 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
       return;
     }
     if (!nuevo.numeroSerie) {
-      toast.warn("Ingresa número de serie");
+      toast.warn("Ingresa número de serie.");
       return;
     }
 
+    // ============================================================
+    // 🔥 Resolver precios: tomar los del producto o los del lote
+    // ============================================================
+    const precioOrigenNum = Number(
+      nuevo.precioOrigen !== "" && nuevo.precioOrigen != null
+        ? nuevo.precioOrigen
+        : precioOrigenLote
+    );
+
+    const precioVentaNum = Number(
+      nuevo.precio !== "" && nuevo.precio != null
+        ? nuevo.precio
+        : precioVentaLote
+    );
+
+    // ============================================================
+    // 🔥 Validaciones fuertes para ambos precios
+    // ============================================================
+    const esPrecioInvalido = (num) => {
+      return (
+        isNaN(num) ||           // no es número
+        num <= 0 ||             // <= 0 no permitido
+        num > 9999999 ||        // número extremadamente grande
+        !isFinite(num)          // infinito o inválido
+      );
+    };
+
+    if (esPrecioInvalido(precioOrigenNum)) {
+      toast.warn("El precio de ORIGEN debe ser un número válido mayor a 0 y menor a 9,999,999.");
+      return;
+    }
+
+    if (esPrecioInvalido(precioVentaNum)) {
+      toast.warn("El precio de VENTA debe ser un número válido mayor a 0 y menor a 9,999,999.");
+      return;
+    }
+
+    // (Opcional) Reglas de negocio: precio venta >= precio origen
+    if (precioVentaNum < precioOrigenNum) {
+      toast.warn("El precio de venta no puede ser menor que el precio de origen.");
+      return;
+    }
+
+    // ============================================================
+    // Observación requerida si está observado
+    // ============================================================
+    if (nuevo.observado === 2 && !nuevo.obsDescripcion.trim()) {
+      toast.warn("Ingresa el detalle de la observación del producto.");
+      return;
+    }
+
+    // ============================================================
+    // Verificar duplicado en la lista actual
+    // ============================================================
     const existeEnLista = items.some(
       (it) =>
         it.numeroSerie?.toString().trim() ===
         nuevo.numeroSerie?.toString().trim()
     );
+
     if (existeEnLista) {
       toast.error("Esta serie ya la agregaste en este movimiento.");
       setSerieOcupada(true);
@@ -238,14 +336,21 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
       }, 3000);
       return;
     }
+
     if (!selCategoria || !selModelo || !selImportacion) {
       toast.warn("Selecciona categoría, modelo e importación primero");
       return;
     }
+
+    // ============================================================
+    // Agregar item
+    // ============================================================
     setItems((old) => [
       ...old,
       {
         ...nuevo,
+        precioOrigen: precioOrigenNum,
+        precio: precioVentaNum,
         categoriaId: selCategoria.id,
         categoriaNombre: selCategoria.nombre,
         modeloId: selModelo.id,
@@ -254,14 +359,19 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
         importacionCodigo: selImportacion.codigo,
       },
     ]);
+
+    // ============================================================
+    // Reset del formulario para escaneo continuo
+    // ============================================================
     setNuevo({
       numeroSerie: "",
       descripcion: "",
-      precio: "",
-      color: "",
-      duracionGarantia: "",
-      tipoGarantia: "MES",
+      precioOrigen: precioOrigenLote,
+      precio: precioVentaLote,
+      observado: 1,
+      obsDescripcion: "",
     });
+
     setSerieOcupada(false);
     setMensajeSerie("");
     setSerieBloqueada(false);
@@ -271,37 +381,72 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
     }
   };
 
+
   const removeItem = (i) =>
     setItems((old) => old.filter((_, idx) => idx !== i));
 
   const guardarEntrada = async () => {
     try {
+      const series = items.map((i) => i.numeroSerie?.toString().trim());
+      const setSeries = new Set(series);
+      if (setSeries.size !== series.length) {
+        toast.error(
+          "Hay series duplicadas en la lista. Revisa antes de guardar."
+        );
+        return;
+      }
+
       for (const it of items) {
         const categoriaId = it.categoriaId ?? selCategoria?.id;
         const modeloId = it.modeloId ?? selModelo?.id;
         const importacionId = it.importacionId ?? selImportacion?.id;
-        const series = items.map((i) => i.numeroSerie?.toString().trim());
-        const setSeries = new Set(series);
-        if (setSeries.size !== series.length) {
-          toast.error("Hay series duplicadas en la lista. Revisa antes de guardar.");
-          return;
-        }
+
         if (!categoriaId || !modeloId || !importacionId) {
           console.warn("Item sin contexto completo:", it);
           continue;
         }
+
+        const precioOrigenNum = Number(it.precioOrigen || 0);
+        const precioVentaNum = Number(it.precio || 0);
+
+        const esPrecioInvalido = (num) =>
+          isNaN(num) || num <= 0 || num > 9_999_999 || !isFinite(num);
+
+        if (esPrecioInvalido(precioOrigenNum)) {
+          toast.error(
+            `El producto con serie ${it.numeroSerie} tiene PRECIO ORIGEN inválido.`
+          );
+          return;
+        }
+
+        if (esPrecioInvalido(precioVentaNum)) {
+          toast.error(
+            `El producto con serie ${it.numeroSerie} tiene PRECIO VENTA inválido.`
+          );
+          return;
+        }
+
+        if (precioVentaNum < precioOrigenNum) {
+          toast.error(
+            `El producto con serie ${it.numeroSerie} tiene precio de venta menor al precio de origen.`
+          );
+          return;
+        }
+
         const productoData = {
           numeroSerie: it.numeroSerie,
-          descripcion: it.descripcion || it.numeroSerie,
-          precio: Number(it.precio || 0),
-          color: it.color || "N/A",
-          duracionGarantia: Number(it.duracionGarantia || 0),
-          tipoGarantia: it.tipoGarantia || "MES",
+          descripcion: it.descripcion,
+          precioOrigen: precioOrigenNum,       // 👈 AHORA SÍ
+          precio: precioVentaNum,
           categoriaId,
           modeloId,
           importacionId,
+          observado: Number(it.observado ?? 1),
+          obsDescripcion: it.obsDescripcion || null,
         };
+
         const prod = await ServiceProducto.create(productoData);
+
         await ServiceMovimiento.create({
           productoId: prod.id,
           almacenId: selAlmacen.id,
@@ -309,6 +454,8 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
           usuarioId: usuarioId ?? null,
         });
       }
+
+
 
       toast.success(`${items.length} producto(s) registrado(s) correctamente`);
       handleClose();
@@ -340,6 +487,7 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
           autoLength={13}
         />
       )}
+
       <DialogTitle className="dialog-title">
         <Box>
           <Typography variant="h6" fontWeight={600}>
@@ -353,12 +501,14 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
           <X size={18} />
         </IconButton>
       </DialogTitle>
+
+      {/* Pasos */}
       <Box className="step-container">
         {STEP_TITLES.map((title, idx) => {
           const active = step === idx;
           const done = step > idx;
           const canNavigate = done || (idx === step + 1 && step0OK && step1OK);
-          
+
           return (
             <Box key={title} className="step-item">
               <Box
@@ -373,7 +523,7 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
               >
                 {done ? <Check size={20} /> : idx + 1}
               </Box>
-              
+
               <Box className="step-label">
                 <Typography
                   className={`
@@ -398,55 +548,95 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
               </Box>
 
               {idx < STEP_TITLES.length - 1 && (
-                <ChevronRight 
-                  size={20} 
-                  color="#667eea" 
-                  style={{ opacity: 0.6, margin: "0 8px" }} 
+                <ChevronRight
+                  size={20}
+                  color="#667eea"
+                  style={{ opacity: 0.6, margin: "0 8px" }}
                 />
               )}
             </Box>
           );
         })}
       </Box>
+
       <Divider />
+
       <DialogContent className="dialog-content">
+        {/* Paso 0: Sucursal */}
         {step === 0 && (
           <Box>
             <Typography variant="body2" color="text.secondary" mb={2}>
-              Selecciona la sucursal donde se realiza el movimiento.
+              {roleKey === "almacen"
+                ? "Sucursal asignada según el usuario de almacén."
+                : "Selecciona la sucursal donde se realiza el movimiento."}
             </Typography>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              {sucursales.map((s) => (
-                <Card
-                  key={s.id}
-                  variant="outlined"
-                  className={`
-                    location-card 
-                    ${selSucursal?.id === s.id ? "location-card-selected" : ""}
-                  `}
-                  onClick={() => setSelSucursal(s)}
-                >
-                  <Box sx={{ p: 2 }}>
-                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <Box sx={{ textAlign: "left" }}>
-                        <Typography fontSize={14} fontWeight={600}>
-                          {s.nombre}
-                        </Typography>
-                        {s.telefono && (
-                          <Typography fontSize={11} color="text.secondary">
-                            {s.telefono}
+              {sucursales.map((s) => {
+                const seleccionada = selSucursal?.id === s.id;
+                const esAsignadaEmpleado =
+                  sucursalEmpleado && sucursalEmpleado.id === s.id;
+
+                // 🔹 si es rol almacen, solo permitir seleccionar su propia sucursal
+                const clickable =
+                  roleKey === "almacen"
+                    ? esAsignadaEmpleado
+                    : true;
+
+                return (
+                  <Card
+                    key={s.id}
+                    variant="outlined"
+                    className={`
+                      location-card 
+                      ${seleccionada ? "location-card-selected" : ""}
+                      ${
+                        roleKey === "almacen" && !esAsignadaEmpleado
+                          ? "location-card-disabled"
+                          : ""
+                      }
+                    `}
+                    onClick={() => {
+                      if (!clickable) return;
+                      setSelSucursal(s);
+                    }}
+                  >
+                    <Box sx={{ p: 2 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Box sx={{ textAlign: "left" }}>
+                          <Typography fontSize={14} fontWeight={600}>
+                            {s.nombre}
                           </Typography>
+                          {s.telefono && (
+                            <Typography fontSize={11} color="text.secondary">
+                              {s.telefono}
+                            </Typography>
+                          )}
+                          {roleKey === "almacen" && esAsignadaEmpleado && (
+                            <Typography
+                              fontSize={11}
+                              color="primary"
+                              sx={{ mt: 0.5 }}
+                            >
+                              Sucursal asignada a tu usuario
+                            </Typography>
+                          )}
+                        </Box>
+                        {seleccionada && (
+                          <Box className="selection-check">
+                            <Check size={12} color="white" />
+                          </Box>
                         )}
                       </Box>
-                      {selSucursal?.id === s.id && (
-                        <Box className="selection-check">
-                          <Check size={12} color="white" />
-                        </Box>
-                      )}
                     </Box>
-                  </Box>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
               {sucursales.length === 0 && (
                 <Typography variant="caption" color="text.disabled">
                   No hay sucursales registradas.
@@ -455,6 +645,8 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
             </Box>
           </Box>
         )}
+
+        {/* Paso 1: Almacén */}
         {step === 1 && (
           <Box>
             <Typography variant="body2" color="text.secondary" mb={2}>
@@ -472,7 +664,13 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
                   onClick={() => setSelAlmacen(a)}
                 >
                   <Box sx={{ p: 2 }}>
-                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
                       <Box sx={{ textAlign: "left" }}>
                         <Typography fontSize={14} fontWeight={600}>
                           {a.nombre}
@@ -500,13 +698,18 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
             </Box>
           </Box>
         )}
+
+        {/* Paso 2: Detalle */}
         {step === 2 && (
           <Box display="flex" flexDirection="column" gap={2}>
             <Box className="movement-type-banner">
               <Typography variant="body2" color="text.secondary">
-                Tipo de movimiento: <strong style={{ color: "#667eea" }}>ENTRADA</strong> (fijo)
+                Tipo de movimiento:{" "}
+                <strong style={{ color: "#667eea" }}>ENTRADA</strong> (fijo)
               </Typography>
             </Box>
+
+            {/* Filtros superiores: categoría / modelo / importación */}
             <Box display="flex" gap={2} flexWrap="wrap">
               <TextField
                 select
@@ -567,7 +770,37 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
                   </MenuItem>
                 ))}
               </TextField>
+                <TextField
+                  label="Precio origen (Bs)"
+                  size="small"
+                  type="number"
+                  sx={{ width: 140 }}
+                  value={precioOrigenLote}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setPrecioOrigenLote(value);
+                    // opcional: actualizar el formulario actual
+                    setNuevo((p) => ({ ...p, precioOrigen: value }));
+                  }}
+                />
+
+                {/* 👇 NUEVO: Precio Venta fijo para el lote */}
+                <TextField
+                  label="Precio venta (Bs)"
+                  size="small"
+                  type="number"
+                  sx={{ width: 140 }}
+                  value={precioVentaLote}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setPrecioVentaLote(value);
+                    // opcional: actualizar el formulario actual
+                    setNuevo((p) => ({ ...p, precio: value }));
+                  }}
+                />
             </Box>
+
+            {/* Formulario de producto */}
             <Card variant="outlined" className="product-form-card">
               <Box display="flex" gap={1} flexWrap="wrap" alignItems="flex-end">
                 <TextField
@@ -607,6 +840,7 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
                     ),
                   }}
                 />
+
                 <TextField
                   label="Descripción"
                   size="small"
@@ -616,50 +850,56 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
                   }
                   sx={{ flex: 1, minWidth: 140 }}
                 />
-                <TextField
-                  label="Precio"
-                  size="small"
-                  type="number"
-                  value={nuevo.precio}
-                  onChange={(e) =>
-                    setNuevo((p) => ({ ...p, precio: e.target.value }))
-                  }
-                  sx={{ width: 90 }}
-                />
-                <TextField
-                  label="Color"
-                  size="small"
-                  value={nuevo.color}
-                  onChange={(e) =>
-                    setNuevo((p) => ({ ...p, color: e.target.value }))
-                  }
-                  sx={{ width: 90 }}
-                />
-                <TextField
-                  label="Garantía"
-                  size="small"
-                  type="number"
-                  value={nuevo.duracionGarantia}
-                  onChange={(e) =>
-                    setNuevo((p) => ({ ...p, duracionGarantia: e.target.value }))
-                  }
-                  sx={{ width: 90 }}
-                />
-                <TextField
-                  select
-                  label="Tipo"
-                  size="small"
-                  value={nuevo.tipoGarantia}
-                  onChange={(e) =>
-                    setNuevo((p) => ({ ...p, tipoGarantia: e.target.value }))
-                  }
-                  sx={{ width: 90 }}
+
+                {/* Observado / Observación */}
+                <FormControl
+                  component="fieldset"
+                  sx={{ minWidth: 200, mt: 1 }}
                 >
-                  <MenuItem value="MES">MES</MenuItem>
-                  <MenuItem value="AÑO">AÑO</MenuItem>
-                </TextField>
-                <Button 
-                  variant="contained" 
+                  <FormLabel
+                    component="legend"
+                    sx={{ fontSize: 12, mb: -0.5 }}
+                  >
+                    Estado del producto
+                  </FormLabel>
+                  <RadioGroup
+                    row
+                    value={nuevo.observado}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      setNuevo((p) => ({
+                        ...p,
+                        observado: value,
+                        ...(value === 1 ? { obsDescripcion: "" } : {}),
+                      }));
+                    }}
+                  >
+                    <FormControlLabel
+                      value={1}
+                      control={<Radio size="small" />}
+                      label="Normal"
+                    />
+                    <FormControlLabel
+                      value={2}
+                      control={<Radio size="small" />}
+                      label="Observado"
+                    />
+                  </RadioGroup>
+                </FormControl>
+
+                <TextField
+                  label="Detalle observación"
+                  size="small"
+                  value={nuevo.obsDescripcion}
+                  onChange={(e) =>
+                    setNuevo((p) => ({ ...p, obsDescripcion: e.target.value }))
+                  }
+                  sx={{ flex: 1, minWidth: 200 }}
+                  disabled={nuevo.observado !== 2}
+                />
+
+                <Button
+                  variant="contained"
                   onClick={addItem}
                   className="next-button"
                 >
@@ -667,19 +907,20 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
                 </Button>
               </Box>
             </Card>
+
+            {/* Lista de productos agregados */}
             <Card variant="outlined">
               <Box className="products-header">
                 <Box sx={{ flex: 1 }}>Serie</Box>
                 <Box sx={{ flex: 1 }}>Descripción</Box>
                 <Box sx={{ width: 70 }}>Precio</Box>
-                <Box sx={{ width: 70 }}>Color</Box>
-                <Box sx={{ width: 110 }}>Garantía</Box>
                 <Box sx={{ flex: 1 }}>Modelo</Box>
                 <Box sx={{ width: 60 }}></Box>
               </Box>
               {items.length === 0 ? (
                 <Box className="empty-state">
-                  Sin productos aún. Agrega el primer producto usando el formulario superior.
+                  Sin productos aún. Agrega el primer producto usando el
+                  formulario superior.
                 </Box>
               ) : (
                 items.map((it, idx) => (
@@ -693,10 +934,6 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
                     <Box sx={{ flex: 1 }}>{it.numeroSerie}</Box>
                     <Box sx={{ flex: 1 }}>{it.descripcion}</Box>
                     <Box sx={{ width: 70 }}>${it.precio}</Box>
-                    <Box sx={{ width: 70 }}>{it.color}</Box>
-                    <Box sx={{ width: 110 }}>
-                      {it.duracionGarantia} {it.tipoGarantia}
-                    </Box>
                     <Box sx={{ flex: 1, color: "text.secondary" }}>
                       {it.modeloNombre || "—"}
                     </Box>
@@ -709,7 +946,7 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
                           "&:hover": {
                             bgcolor: "error.light",
                             color: "white",
-                          }
+                          },
                         }}
                       >
                         <Trash2 size={14} />
@@ -721,11 +958,14 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
             </Card>
           </Box>
         )}
+
+        {/* Paso 3: Resumen */}
         {step === 3 && (
           <Box display="flex" flexDirection="column" gap={2}>
             <Typography variant="body2" color="text.secondary">
               Revisa los datos antes de guardar.
             </Typography>
+
             <Card variant="outlined" className="summary-card">
               <Typography fontWeight={700} mb={1} color="#1976d2">
                 Datos generales
@@ -745,19 +985,16 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
                 </Typography>
               </Box>
             </Card>
+
             <Card variant="outlined">
               <Box className="products-header">
                 <Box sx={{ flex: 1 }}>Serie</Box>
                 <Box sx={{ flex: 1 }}>Descripción</Box>
                 <Box sx={{ width: 70 }}>Precio</Box>
-                <Box sx={{ width: 70 }}>Color</Box>
-                <Box sx={{ width: 110 }}>Garantía</Box>
                 <Box sx={{ flex: 1 }}>Modelo</Box>
               </Box>
               {items.length === 0 ? (
-                <Box className="empty-state">
-                  No agregaste productos.
-                </Box>
+                <Box className="empty-state">No agregaste productos.</Box>
               ) : (
                 items.map((it, idx) => (
                   <Box
@@ -770,10 +1007,6 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
                     <Box sx={{ flex: 1 }}>{it.numeroSerie}</Box>
                     <Box sx={{ flex: 1 }}>{it.descripcion}</Box>
                     <Box sx={{ width: 70 }}>${it.precio}</Box>
-                    <Box sx={{ width: 70 }}>{it.color}</Box>
-                    <Box sx={{ width: 110 }}>
-                      {it.duracionGarantia} {it.tipoGarantia}
-                    </Box>
                     <Box sx={{ flex: 1, color: "text.secondary" }}>
                       {it.modeloNombre || "—"}
                     </Box>
@@ -784,31 +1017,27 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
           </Box>
         )}
       </DialogContent>
+
       <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
-        <Button 
+        <Button
           onClick={handleClose}
           variant="outlined"
           className="cancel-button"
         >
           Cancelar
         </Button>
+
         {step > 0 && (
-          <Button 
-            onClick={prev}
-            variant="outlined"
-            className="back-button"
-          >
+          <Button onClick={prev} variant="outlined" className="back-button">
             Atrás
           </Button>
         )}
+
         {step < STEP_TITLES.length - 1 ? (
           <Button
             variant="contained"
             onClick={next}
-            disabled={
-              (step === 0 && !step0OK) ||
-              (step === 1 && !step1OK)
-            }
+            disabled={(step === 0 && !step0OK) || (step === 1 && !step1OK)}
             className="next-button"
           >
             Siguiente
@@ -818,7 +1047,9 @@ export default function InventarioFlow({ isOpen, onClose, usuarioId = null }) {
             variant="contained"
             onClick={guardarEntrada}
             disabled={!canGuardarEntrada}
-            className={canGuardarEntrada ? "save-button" : "save-button:disabled"}
+            className={
+              canGuardarEntrada ? "save-button" : "save-button:disabled"
+            }
           >
             Guardar movimiento
           </Button>

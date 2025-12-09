@@ -1,5 +1,6 @@
+
 import { useState, useEffect, useRef } from "react";
-import { Eye, PencilLine, Plus } from "lucide-react";
+import { Eye, PencilLine } from "lucide-react"; // 👈 Quitamos Plus
 import GridGenerico from "@/components/Grid";
 import DetailsDialog from "@/components/details";
 import ProductoForm from "./ProductoForm";
@@ -8,6 +9,7 @@ import ServiceModeloProducto from "@/services/ServiceModeloProducto";
 import ServiceCategoria from "@/services/ServiceCategoria";
 import ServiceImportacion from "@/services/ServiceImportacion";
 import { toast } from "react-toastify";
+import { useAuth } from "@/context/AuthContext";
 
 const ProductList = () => {
   const [selectedId, setSelectedId] = useState(null);
@@ -20,103 +22,73 @@ const ProductList = () => {
 
   const gridRef = useRef(null);
 
-  // cargar catálogos (1 sola vez)
+  // 👇 permisos por rol
+  const { user } = useAuth();
+  const roleKey = (user?.rol || "").trim().toLowerCase(); // "Almacen" -> "almacen"
+
+  const canCreate = roleKey === "administrador" || roleKey === "almacen";
+  const canEdit = roleKey === "administrador" || roleKey === "almacen";
+  const canDelete = roleKey === "administrador"; // (por si luego agregas eliminar)
+
   useEffect(() => {
     (async () => {
-      // modelos
       try {
         const data = await ServiceModeloProducto.getAll();
-        const list = Array.isArray(data) ? data : data?.items ? data.items : [];
-        setModelos(list);
+        setModelos(Array.isArray(data) ? data : data?.items || []);
       } catch {
         setModelos([]);
       }
 
-      // categorías
       try {
         const data = await ServiceCategoria.getAll();
-        const list = Array.isArray(data) ? data : data?.items ? data.items : [];
-        setCategorias(list);
+        setCategorias(Array.isArray(data) ? data : data?.items || []);
       } catch {
         setCategorias([]);
       }
 
-      // importaciones
       try {
         const data = await ServiceImportacion.getAll();
-        const list = Array.isArray(data) ? data : data?.items ? data.items : [];
-        setImportaciones(list);
+        setImportaciones(Array.isArray(data) ? data : data?.items || []);
       } catch {
         setImportaciones([]);
       }
     })();
   }, []);
 
-  // helpers seguros
   const getModeloNombre = (id) => {
-    if (!id) return "";
-    const arr = Array.isArray(modelos) ? modelos : [];
-    const found = arr.find((x) => x.id === id);
-    return found ? found.nombreModelo : id;
+    const found = modelos.find((x) => x.id === id);
+    return found ? found.nombreModelo : `#${id}`;
   };
 
   const getCategoriaNombre = (id) => {
-    if (!id) return "";
-    const arr = Array.isArray(categorias) ? categorias : [];
-    const found = arr.find((x) => x.id === id);
-    // cambia "nombre" si tu backend manda "nombreCategoria"
-    return found ? (found.nombre || found.nombreCategoria || id) : id;
+    const found = categorias.find((x) => x.id === id);
+    return found ? found.nombre || found.nombreCategoria : `#${id}`;
   };
 
   const getImportacionCodigo = (id) => {
-    if (!id) return "";
-    const arr = Array.isArray(importaciones) ? importaciones : [];
-    const found = arr.find((x) => x.id === id);
-    // cambia "codigo" si tu backend manda "codigoImportacion" o "nroFactura"
-    return found ? (found.codigo || found.codigoImportacion || id) : id;
+    const found = importaciones.find((x) => x.id === id);
+    return found ? found.codigo || found.codigoImportacion : `#${id}`;
   };
 
-  // ver detalles
-  const handleView = (id) => {
-    setSelectedId(id);
-  };
-
-  // editar
   const handleEdit = async (id) => {
     try {
       const data = await ServiceProducto.getById(id);
       setFormData(data);
       setShowForm(true);
-    } catch (error) {
-      toast.error("Error al cargar datos para editar");
+    } catch {
+      toast.error("Error al cargar producto para editar");
     }
   };
 
-  const handleCreate = () => {
-    setFormData(null);
-    setShowForm(true);
-  };
-
-  const handleCloseForm = () => {
-    setShowForm(false);
-    if (gridRef.current?.reload) {
-      gridRef.current.reload();
-    }
-  };
-
-  // columnas
   const columns = [
     { name: "N° Serie", selector: (row) => row.numeroSerie, sortable: true },
     { name: "Descripción", selector: (row) => row.descripcion, sortable: true },
     {
-      name: "Precio",
-      selector: (row) => `${row.precio} Bs`,
+      name: "Precio (Bs)",
+      selector: (row) => row.precio,
       sortable: true,
       right: true,
     },
-    { name: "Color", selector: (row) => row.color },
-    { name: "Garantía", selector: (row) => row.duracionGarantia },
-    { name: "Tipo Garantía", selector: (row) => row.tipoGarantia },
     {
       name: "Categoría",
       selector: (row) => getCategoriaNombre(row.categoriaId),
@@ -141,52 +113,49 @@ const ProductList = () => {
     {
       name: "Acciones",
       cell: (row) => (
-        <div className="flex gap-2 items-center justify-end">
+        <div className="flex gap-2 justify-end">
+          {/* Ver detalles: todos */}
           <button
-            type="button"
-            onClick={() => handleView(row.id)}
+            onClick={() => setSelectedId(row.id)}
             className="p-1 rounded hover:bg-gray-100"
             title="Ver detalles"
           >
             <Eye size={18} className="text-blue-500" />
           </button>
-          <button
-            type="button"
-            onClick={() => handleEdit(row.id)}
-            className="p-1 rounded hover:bg-gray-100"
-            title="Editar"
-          >
-            <PencilLine size={18} className="text-green-500" />
-          </button>
+
+          {/* Editar: solo admin / almacén */}
+          {canEdit && (
+            <button
+              onClick={() => handleEdit(row.id)}
+              className="p-1 rounded hover:bg-gray-100"
+              title="Editar"
+            >
+              <PencilLine size={18} className="text-green-500" />
+            </button>
+          )}
         </div>
       ),
-      width: "110px",
+      width: "120px",
       right: true,
     },
   ];
 
-  // fields para el dialog
   const detailFields = [
     { key: "numeroSerie", label: "Número de Serie" },
     { key: "descripcion", label: "Descripción" },
     { key: "precio", label: "Precio", format: (v) => `${v} Bs` },
-    { key: "color", label: "Color" },
-    { key: "duracionGarantia", label: "Duración de Garantía" },
-    { key: "tipoGarantia", label: "Tipo de Garantía" },
+    { key: "categoriaId", label: "Categoría", format: getCategoriaNombre },
+    { key: "modeloId", label: "Modelo", format: getModeloNombre },
+    { key: "importacionId", label: "Importación", format: getImportacionCodigo },
     {
-      key: "categoriaId",
-      label: "Categoría",
-      format: (v) => getCategoriaNombre(v),
+      key: "observado",
+      label: "Observado",
+      format: (v) =>
+        v === 1 ? "No" : v === 2 ? "Sí" : v == null ? "—" : String(v),
     },
     {
-      key: "modeloId",
-      label: "Modelo",
-      format: (v) => getModeloNombre(v),
-    },
-    {
-      key: "importacionId",
-      label: "Importación",
-      format: (v) => getImportacionCodigo(v),
+      key: "obsDescripcion",
+      label: "Detalle observación",
     },
     {
       key: "estado",
@@ -204,8 +173,10 @@ const ProductList = () => {
   return (
     <div className="p-4">
       <div className="flex justify-between items-center mb-3">
-        <h2 className="text-xl font-semibold">Listado de Productos</h2>
-        
+        <h2 className="text-xl font-semibold">Gestión de Productos</h2>
+
+        {/* 🔴 YA NO HAY BOTÓN PARA AGREGAR PRODUCTO */}
+        {/* {canCreate && (...)}  -> eliminado */}
       </div>
 
       <GridGenerico
@@ -220,8 +191,8 @@ const ProductList = () => {
       {showForm && (
         <ProductoForm
           initialData={formData}
-          onClose={handleCloseForm}
-          onSuccess={handleCloseForm}
+          onClose={() => setShowForm(false)}
+          onSuccess={() => gridRef.current?.reload?.()}
         />
       )}
 

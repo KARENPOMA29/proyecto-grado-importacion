@@ -1,4 +1,3 @@
-// src/routes/pages/clientes/ClienteList.jsx
 import { useState, useRef } from "react";
 import { PencilLine, Trash, Eye } from "lucide-react";
 import GridGenerico from "@/components/Grid";
@@ -21,32 +20,57 @@ const ClienteList = () => {
   const roleKey = (user?.rol || "").trim().toLowerCase();
 
   // 👇 permisos al estilo de AlmacenList
-  // Admin y Encargado de Ventas pueden crear y editar
   const canCreate =
     roleKey === "administrador" || roleKey === "ventas";
   const canEdit =
-    roleKey === "administrador" ||  roleKey === "ventas";
-  // solo admin puede borrar (ajusta si quieres que ventas también)
+    roleKey === "administrador" || roleKey === "ventas";
   const canDelete = roleKey === "administrador";
 
+  // 🔄 AHORA columnas según nuevo schema
   const columns = [
-    { name: "Nombre", selector: (r) => r.nombre, sortable: true, minWidth: "120px" },
-    { name: "Apellido", selector: (r) => r.apellido, sortable: true, minWidth: "120px" },
-    { name: "Segundo Apellido", selector: (r) => r.segundoApellido, sortable: true, minWidth: "120px" },
-    { name: "CI", selector: (r) => r.ci, sortable: true, minWidth: "100px" },
-    { name: "Correo", selector: (r) => r.correo, sortable: true, minWidth: "180px", grow: 2 },
+    {
+      name: "Razón Social",
+      selector: (r) => r.razonSocial,
+      sortable: true,
+      minWidth: "180px",
+      grow: 2,
+    },
+    {
+      name: "NIT",
+      selector: (r) => r.nit,
+      sortable: true,
+      minWidth: "120px",
+    },
+    {
+      name: "Correo",
+      selector: (r) => r.correo,
+      sortable: true,
+      minWidth: "180px",
+      grow: 2,
+    },
+    {
+      name: "Teléfono",
+      selector: (r) => r.telefono,
+      sortable: true,
+      minWidth: "110px",
+    },
   ];
 
+  // 🔄 Campos para el diálogo de detalles
   const fields = [
-    { label: "Nombre", key: "nombre" },
-    { label: "Apellido", key: "apellido" },
-    { label: "Segundo Apellido", key: "segundoApellido" },
-    { label: "CI", key: "ci" },
+    { label: "Razón Social", key: "razonSocial" },
+    { label: "NIT", key: "nit" },
     { label: "Correo", key: "correo" },
+    { label: "Teléfono", key: "telefono" },
     {
       label: "Fecha Registro",
       key: "fechaRegistro",
       format: (v) => (v ? new Date(v).toLocaleString() : "—"),
+    },
+    {
+      label: "Estado",
+      key: "estado",
+      format: (v) => (v === 1 ? "Activo" : "Inactivo"),
     },
   ];
 
@@ -99,7 +123,7 @@ const ClienteList = () => {
         ref={gridRef}
         service={ServiceCliente}
         columns={columns}
-        defaultSortField="nombre"
+        defaultSortField="razonSocial"
         defaultSortAsc={true}
         pageSize={10}
         renderActions={(row) => (
@@ -113,7 +137,7 @@ const ClienteList = () => {
               <Eye size={16} />
             </button>
 
-            {/* ✏️ editar: admin + encargado de ventas + ventas */}
+            {/* ✏️ editar: admin + ventas */}
             {canEdit && (
               <button
                 className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors duration-200"
@@ -124,7 +148,7 @@ const ClienteList = () => {
               </button>
             )}
 
-            {/* 🗑️ eliminar: solo admin (puedes agregar ventas si querés) */}
+            {/* 🗑️ eliminar: solo admin */}
             {canDelete && (
               <button
                 className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duration-200"
@@ -149,7 +173,7 @@ const ClienteList = () => {
       {idToDelete && canDelete && (
         <DeleteConfirm
           title="¿Eliminar cliente?"
-          message="Esta acción eliminará el cliente permanentemente y no se podrá deshacer."
+          message="Esta acción eliminará el cliente lógicamente y no se podrá deshacer."
           onConfirm={handleDelete}
           onCancel={() => setIdToDelete(null)}
         />

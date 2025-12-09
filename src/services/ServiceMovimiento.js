@@ -3,9 +3,10 @@ import api from "./api";
 
 const BASE = "/movimientos";
 
-const getAll = async () => {
+// 👇 ahora acepta params (por ejemplo { usuarioId: 1006 })
+const getAll = async (params = {}) => {
   try {
-    const { data } = await api.get(`${BASE}/`);
+    const { data } = await api.get(`${BASE}/`, { params });
     // backend devuelve lista simple
     return { items: data, total: data.length };
   } catch (err) {

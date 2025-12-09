@@ -3,10 +3,19 @@ import { PencilLine, Trash, Eye } from "lucide-react";
 import GridGenerico from "@/components/Grid";
 import DetailsDialog from "@/components/details";
 import DeleteConfirm from "@/components/deleteConfirm";
-import ModeloProductoForm from "./modeloproductoForm";
+import ModeloProductoForm from "./ModeloProductoForm";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "react-toastify";
 import ServiceModeloProducto from "@/services/ServiceModeloProducto";
+
+const getTipoGarantiaLabel = (code) => {
+  if (!code) return "—";
+  const c = String(code).toUpperCase();
+  if (c === "DIAS") return "Días";
+  if (c === "MESES") return "Meses";
+  if (c === "ANIOS") return "Años";
+  return code;
+};
 
 const ModeloProductoList = () => {
   const [selectedId, setSelectedId] = useState(null);
@@ -16,35 +25,129 @@ const ModeloProductoList = () => {
   const gridRef = useRef(null);
 
   const { user } = useAuth();
-  // 👇 igual que en AlmacenList
   const roleKey = (user?.rol || "").trim().toLowerCase();
 
-  // 🟢 permisos
+  // permisos
   const canCreate = roleKey === "administrador" || roleKey === "almacen";
   const canEdit = roleKey === "administrador" || roleKey === "almacen";
   const canDelete = roleKey === "administrador";
 
   const columns = [
-    { name: "Modelo", selector: (r) => r.nombreModelo, sortable: true, minWidth: "150px" },
-    { name: "Marca", selector: (r) => r.marca, sortable: true, minWidth: "120px" },
+    {
+      name: "Imagen",
+      selector: (r) =>
+        r.urlImagen ? (
+          <img
+            src={r.urlImagen}
+            alt={r.nombreModelo}
+            style={{
+              width: 40,
+              height: 40,
+              objectFit: "cover",
+              borderRadius: 4,
+              border: "1px solid #ccc",
+            }}
+          />
+        ) : (
+          "—"
+        ),
+      minWidth: "80px",
+    },
+    {
+      name: "Modelo",
+      selector: (r) => r.nombreModelo,
+      sortable: true,
+      minWidth: "150px",
+    },
+    {
+      name: "Marca",
+      selector: (r) => r.marca?.nombre ?? "—",
+      sortable: true,
+      minWidth: "120px",
+    },
+    {
+      name: "Color",
+      selector: (r) => r.color || "—",
+      sortable: true,
+      minWidth: "120px",
+    },
     {
       name: "Capacidad/Tamaño",
       selector: (r) => r.capacidadOTamano ?? "-",
       sortable: true,
       minWidth: "140px",
     },
-    { name: "Unidad", selector: (r) => r.unidadMedida ?? "-", sortable: true, minWidth: "100px" },
-    { name: "Stock Actual", selector: (r) => r.stockActual, sortable: true, minWidth: "120px" },
-    { name: "Stock Mínimo", selector: (r) => r.stockMinimo, sortable: true, minWidth: "120px" },
+    {
+      name: "Unidad",
+      selector: (r) => r.unidadMedida ?? "-",
+      sortable: true,
+      minWidth: "100px",
+    },
+    {
+      name: "Stock Actual",
+      selector: (r) => r.stockActual,
+      sortable: true,
+      minWidth: "120px",
+    },
+    {
+      name: "Stock Mínimo",
+      selector: (r) => r.stockMinimo,
+      sortable: true,
+      minWidth: "120px",
+    },
+    {
+      name: "Garantía",
+      selector: (r) =>
+        r.duracionGarantia
+          ? `${r.duracionGarantia} ${getTipoGarantiaLabel(r.tipoGarantia)}`
+          : "—",
+      sortable: true,
+      minWidth: "150px",
+    },
   ];
 
   const fields = [
+    {
+      label: "Imagen",
+      key: "urlImagen",
+      format: (v) =>
+        v ? (
+          <img
+            src={v}
+            alt="imagen modelo"
+            style={{
+              width: 120,
+              height: 120,
+              objectFit: "cover",
+              borderRadius: 8,
+              border: "1px solid #ccc",
+            }}
+          />
+        ) : (
+          "—"
+        ),
+    },
     { label: "Modelo", key: "nombreModelo" },
-    { label: "Marca", key: "marca" },
+    {
+      label: "Marca",
+      key: "marca",
+      format: (v) => v?.nombre ?? "—",
+    },
+
+    { label: "Color", key: "color" },
     { label: "Capacidad/Tamaño", key: "capacidadOTamano" },
     { label: "Unidad", key: "unidadMedida" },
     { label: "Stock Actual", key: "stockActual" },
     { label: "Stock Mínimo", key: "stockMinimo" },
+    {
+      label: "Duración Garantía",
+      key: "duracionGarantia",
+    },
+    {
+      label: "Tipo Garantía",
+      key: "tipoGarantia",
+      format: (v) => getTipoGarantiaLabel(v),
+    },
     {
       label: "Fecha Registro",
       key: "fechaRegistro",
@@ -57,10 +160,10 @@ const ModeloProductoList = () => {
       await ServiceModeloProducto.remove(idToDelete);
       toast.success("Modelo eliminado correctamente");
       gridRef.current?.refetch();
-      return Promise.resolve();
     } catch (error) {
-      console.error("Error eliminando modelo:", error);
-      throw error;
+      toast.error(error.message);
+    } finally {
+      setIdToDelete(null);
     }
   };
 
@@ -76,7 +179,6 @@ const ModeloProductoList = () => {
 
   return (
     <div className="flex flex-col gap-y-6 p-4 sm:p-6">
-      {/* HEADER */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
           Gestión de Modelos de Producto
@@ -105,7 +207,6 @@ const ModeloProductoList = () => {
         pageSize={10}
         renderActions={(row) => (
           <div className="flex gap-x-2 justify-end">
-            {/* 👁 todos pueden ver */}
             <button
               className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors duration-200"
               onClick={() => setSelectedId(row.id)}
@@ -114,7 +215,6 @@ const ModeloProductoList = () => {
               <Eye size={16} />
             </button>
 
-            {/* ✏️ editar: administrador + almacen */}
             {canEdit && (
               <button
                 className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors duration-200"
@@ -125,7 +225,6 @@ const ModeloProductoList = () => {
               </button>
             )}
 
-            {/* 🗑 eliminar: solo administrador */}
             {canDelete && (
               <button
                 className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duration-200"

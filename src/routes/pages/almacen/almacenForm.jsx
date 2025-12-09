@@ -1,3 +1,4 @@
+// src/routes/pages/almacen/almacenForm.jsx
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import {
@@ -15,69 +16,70 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Divider,
 } from "@mui/material";
 import { useForm, Controller } from "react-hook-form";
 import ServiceAlmacen from "@/services/ServiceAlmacen";
 
-const AlmacenForm = ({ onClose, onSuccess, initialData = null, sucursales = [] }) => {
+const AlmacenForm = ({
+  onClose,
+  onSuccess,
+  initialData = null,
+  sucursales = [],
+  // 👇 sucursal desde donde se abrió (ej: diálogo por sucursal)
+  sucursalContext = null,
+}) => {
   const {
     control,
-    register,
     handleSubmit,
-    formState: { errors },
     reset,
     setValue,
   } = useForm({
-    defaultValues: { nombre: "", sucursalId: "" },
+    mode: "onBlur",           // valida al salir del campo
+    reValidateMode: "onChange", // revalida al escribir
+    defaultValues: { nombre: "", direccion: "", sucursalId: "" },
   });
 
   const [formError, setFormError] = useState("");
-  const [touched, setTouched] = useState({
-    nombre: false,
-    sucursalId: false,
-  });
   const [loading, setLoading] = useState(false);
 
+  // ⏱ Cargar datos iniciales / sucursal por contexto
   useEffect(() => {
     if (initialData) {
+      // 🟢 Editar
       setValue("nombre", initialData.nombre ?? "");
+      setValue("direccion", initialData.direccion ?? "");
       setValue("sucursalId", initialData.sucursalId ?? "");
+    } else if (sucursalContext) {
+      // 🟢 Crear desde una sucursal específica
+      reset({
+        nombre: "",
+        direccion: "",
+        sucursalId: sucursalContext.id, // 👈 preseleccionado
+      });
     } else {
-      reset({ nombre: "", sucursalId: "" });
+      // 🟢 Crear normal desde lista de almacenes
+      reset({ nombre: "", direccion: "", sucursalId: "" });
     }
+
     setFormError("");
-    setTouched({
-      nombre: false,
-      sucursalId: false,
-    });
-  }, [initialData, setValue, reset]);
+  }, [initialData, sucursalContext, setValue, reset]);
 
   const onSubmit = async (data) => {
     setFormError("");
-    // marcar los campos
-    setTouched({
-      nombre: true,
-      sucursalId: true,
-    });
 
-    // validación extra: nombre sin caracteres raros
     const nombreLimpio = data.nombre?.trim() || "";
-    const regexNombre = /^[A-Za-zÁÉÍÓÚáéíóúÑñ0-9 .-]+$/;
-
-    if (!nombreLimpio) {
-      setFormError("Por favor complete el nombre del almacén");
-      return;
-    }
-    if (!regexNombre.test(nombreLimpio)) {
-      setFormError("El nombre no debe tener caracteres especiales");
-      return;
-    }
+    const direccionLimpia = data.direccion?.trim() || "";
 
     setLoading(true);
     try {
       const payload = {
         nombre: nombreLimpio,
-        sucursalId: data.sucursalId === "" ? null : Number(data.sucursalId),
+        direccion: direccionLimpia,
+        sucursalId:
+          data.sucursalId === "" || data.sucursalId == null
+            ? null
+            : Number(data.sucursalId),
       };
 
       if (initialData?.id) {
@@ -87,13 +89,16 @@ const AlmacenForm = ({ onClose, onSuccess, initialData = null, sucursales = [] }
         await ServiceAlmacen.create(payload);
         toast.success("Almacén creado correctamente");
       }
+
       onSuccess?.();
       onClose?.();
-      reset({ nombre: "", sucursalId: "" });
+      reset({ nombre: "", direccion: "", sucursalId: "" });
     } catch (err) {
       console.error("Error al guardar el almacén:", err);
       const msg =
-        err.response?.data?.detail || err.message || "Error al procesar el almacén";
+        err.response?.data?.detail ||
+        err.message ||
+        "Error al procesar el almacén";
       setFormError(msg);
       toast.error(msg);
     } finally {
@@ -101,43 +106,75 @@ const AlmacenForm = ({ onClose, onSuccess, initialData = null, sucursales = [] }
     }
   };
 
-  // para limpiar mientras escribe
   const handleNombreChange = (e, onChangeRHForm) => {
     const value = e.target.value.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ0-9 .-]/g, "");
     onChangeRHForm(value);
-    setTouched((prev) => ({ ...prev, nombre: true }));
+  };
+
+  const handleDireccionChange = (e, onChangeRHForm) => {
+    const value = e.target.value.replace(
+      /[^A-Za-zÁÉÍÓÚáéíóúÑñ0-9 .,#\-]/g,
+      ""
+    );
+    onChangeRHForm(value);
   };
 
   return (
     <Dialog
-      open={true} // en tu lista real cambia a open={open}
+      open={true}
       onClose={onClose}
       maxWidth="sm"
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 2,
-          overflow: "visible", // 👈 para que no se corte el select / autosuggest
+          borderRadius: 3,
+          overflow: "hidden",
+          boxShadow: "0 12px 36px rgba(0,0,0,0.18)",
         },
       }}
     >
+      {/* HEADER con gradiente vino */}
       <DialogTitle
         component="div"
-        sx={{ borderBottom: "1px solid", borderColor: "divider", pb: 2 }}
+        sx={{
+          p: 2.5,
+          pb: 2,
+          background: "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
+          color: "#F5F5F5",
+        }}
       >
-        <Typography variant="h6" component="span" fontWeight={600}>
+        <Typography variant="h6" component="span" fontWeight={700}>
           {initialData ? "Editar Almacén" : "Nuevo Almacén"}
         </Typography>
+        
+        {sucursalContext && (
+          <Typography
+            variant="body2"
+            sx={{ mt: 0.5, fontStyle: "italic", color: "#FFEFEF" }}
+          >
+            Sucursal: <strong>{sucursalContext.nombre}</strong>
+          </Typography>
+        )}
       </DialogTitle>
 
       <DialogContent
         sx={{
           py: 3,
-          overflow: "visible", // 👈 importantísimo
-          maxHeight: "60vh", // si hay poco alto, que scrollee adentro
+          px: 3,
+          bgcolor: "#FAFAFA",
         }}
       >
-        <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
+        <Box
+          component="form"
+          onSubmit={handleSubmit(onSubmit)}
+          noValidate
+          sx={{
+            bgcolor: "#FFFFFF",
+            borderRadius: 2,
+            p: 2.5,
+            boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+          }}
+        >
           <Grid container spacing={2}>
             {/* NOMBRE */}
             <Grid item xs={12}>
@@ -145,29 +182,55 @@ const AlmacenForm = ({ onClose, onSuccess, initialData = null, sucursales = [] }
                 name="nombre"
                 control={control}
                 rules={{
-                  required: "Campo requerido",
+                  required: "El nombre es obligatorio",
                   maxLength: { value: 100, message: "Máximo 100 caracteres" },
+                  pattern: {
+                    value: /^[A-Za-zÁÉÍÓÚáéíóúÑñ0-9 .-]+$/,
+                    message: "No se permiten caracteres especiales",
+                  },
                 }}
-                render={({ field }) => (
+                render={({ field, fieldState }) => (
                   <TextField
                     {...field}
                     fullWidth
-                    label="Nombre"
+                    size="small"
+                    label="Nombre del almacén"
                     onChange={(e) => handleNombreChange(e, field.onChange)}
-                    error={
-                      (touched.nombre && !!errors.nombre) ||
-                      (touched.nombre &&
-                        field.value &&
-                        !/^[A-Za-zÁÉÍÓÚáéíóúÑñ0-9 .-]+$/.test(field.value))
-                    }
+                    error={!!fieldState.error}
                     helperText={
-                      touched.nombre && errors.nombre
-                        ? errors.nombre.message
-                        : touched.nombre &&
-                          field.value &&
-                          !/^[A-Za-zÁÉÍÓÚáéíóúÑñ0-9 .-]+$/.test(field.value)
-                        ? "No se permiten caracteres especiales"
-                        : ""
+                      fieldState.error?.message || "Obligatorio"
+                    }
+                    disabled={loading}
+                  />
+                )}
+              />
+            </Grid>
+
+            {/* DIRECCIÓN */}
+            <Grid item xs={12}>
+              <Controller
+                name="direccion"
+                control={control}
+                rules={{
+                  required: "La dirección es obligatoria",
+                  maxLength: { value: 200, message: "Máximo 200 caracteres" },
+                  pattern: {
+                    value: /^[A-Za-zÁÉÍÓÚáéíóúÑñ0-9 .,#\-]+$/,
+                    message: "La dirección contiene caracteres no permitidos",
+                  },
+                }}
+                render={({ field, fieldState }) => (
+                  <TextField
+                    {...field}
+                    fullWidth
+                    size="small"
+                    label="Dirección"
+                    onChange={(e) =>
+                      handleDireccionChange(e, field.onChange)
+                    }
+                    error={!!fieldState.error}
+                    helperText={
+                      fieldState.error?.message || "Obligatorio"
                     }
                     disabled={loading}
                   />
@@ -177,7 +240,11 @@ const AlmacenForm = ({ onClose, onSuccess, initialData = null, sucursales = [] }
 
             {/* SUCURSAL */}
             <Grid item xs={12}>
-              <FormControl fullWidth disabled={loading}>
+              <FormControl
+                fullWidth
+                disabled={loading || !!sucursalContext}
+                size="small"
+              >
                 <InputLabel id="sucursal-label">Sucursal</InputLabel>
                 <Controller
                   name="sucursalId"
@@ -188,13 +255,12 @@ const AlmacenForm = ({ onClose, onSuccess, initialData = null, sucursales = [] }
                       labelId="sucursal-label"
                       label="Sucursal"
                       MenuProps={{
-                        sx: { zIndex: 2000 }, // 👈 para que quede por encima del dialog
+                        sx: { zIndex: 2000 },
                       }}
-                      onOpen={() =>
-                        setTouched((prev) => ({ ...prev, sucursalId: true }))
-                      }
                     >
-                      <MenuItem value="">— Ninguna —</MenuItem>
+                      {!sucursalContext && (
+                        <MenuItem value="">— Ninguna —</MenuItem>
+                      )}
                       {sucursales.map((s) => (
                         <MenuItem key={s.id} value={s.id}>
                           {s.nombre}
@@ -215,15 +281,45 @@ const AlmacenForm = ({ onClose, onSuccess, initialData = null, sucursales = [] }
         </Box>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
-        <Button onClick={onClose} variant="outlined" disabled={loading}>
+      <Divider />
+
+      <DialogActions sx={{ px: 3, pb: 2.5, gap: 1.5 }}>
+        <Button
+          onClick={onClose}
+          variant="outlined"
+          disabled={loading}
+          sx={{
+            textTransform: "none",
+            borderRadius: 999,
+            px: 3,
+            borderColor: "#e0e0e0",
+            color: "rgba(0,0,0,0.7)",
+            "&:hover": {
+              borderColor: "#d32f2f",
+              color: "#d32f2f",
+              backgroundColor: "rgba(211,47,47,0.04)",
+            },
+          }}
+        >
           Cancelar
         </Button>
         <Button
           onClick={handleSubmit(onSubmit)}
           variant="contained"
           disabled={loading}
-          sx={{ minWidth: 100 }}
+          sx={{
+            textTransform: "none",
+            borderRadius: 999,
+            px: 4,
+            minWidth: 140,
+            fontWeight: 600,
+            background: "linear-gradient(135deg, #14AE5C 0%, #0D8C47 100%)",
+            "&:hover": {
+              background:
+                "linear-gradient(135deg, #0D8C47 0%, #0A6B37 100%)",
+              boxShadow: "0 4px 12px rgba(20,174,92,0.4)",
+            },
+          }}
         >
           {loading ? "Guardando..." : "Guardar"}
         </Button>

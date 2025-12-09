@@ -1,259 +1,313 @@
-// src/pages/importaciones/ImportacionList.jsx
-import { useEffect, useRef, useState } from "react";
-import { PencilLine, Trash, Eye } from "lucide-react";
-import GridGenerico from "@/components/Grid";
-import Details from "@/components/details";
-import DeleteConfirm from "@/components/deleteConfirm";
-import ImportacionForm from "./ImportacionForm";
-import ServiceImportacion from "@/services/ServiceImportacion";
-import ServiceProveedor from "@/services/ServiceProveedor";
+import { useState, useRef } from "react";
+import { Eye, PencilLine, Plus, Route } from "lucide-react";
+import {
+  Box,
+  Button,
+  IconButton,
+  Tooltip,
+  Typography,
+  Chip,
+} from "@mui/material";
 import { toast } from "react-toastify";
-import { useAuth } from "@/context/AuthContext"; // 👈
-import ServiceEmpleado from "@/services/ServiceEmpleado"; // 👈 importa esto
 
+import GridGenerico from "@/components/Grid";
+import DetailsDialog from "@/components/details";
+
+import ImportacionForm from "./ImportacionForm";
+import MovimientoImportacionDialog from "./MovimientoImportacionDialog";
+
+import ServiceImportacion from "@/services/ServiceImportacion";
+import { useAuth } from "@/context/AuthContext";
 
 const ImportacionList = () => {
-  const [selectedId, setSelectedId] = useState(null);
-  const [idToDelete, setIdToDelete] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState(null);
-  const [proveedores, setProveedores] = useState([]);
   const gridRef = useRef(null);
+  const { user } = useAuth(); // para detectar el rol
 
-  const { user } = useAuth();
-  const roleKey = (user?.rol || "").trim().toLowerCase();
-  const canCreate = roleKey === "administrador" || roleKey === "almacen" || roleKey === "pilotero" ;
+  // 👇 obtenemos el rol crudo y lo normalizamos (trim + minúsculas)
+  const rawRoleKey =
+    user?.rolKey ||
+    user?.role ||
+    user?.rol ||
+    user?.perfil?.rol ||
+    user?.perfil?.nombre ||
+    "";
+  const roleKey = rawRoleKey.toString().trim().toLowerCase();
+  const empleadoId = user?.id;
+
+  // 👇 permisos por rol
+  const canCreate =
+    roleKey === "administrador" ||
+    roleKey === "almacen";
   const canEdit = roleKey === "administrador";
   const canDelete = roleKey === "administrador";
 
-  // id/nombre del usuario logueado (para guardar quién creó la importación)
-  const usuarioIdLogueado = user?.id ?? user?.empleadoId ?? null;
-  const usuarioNombre = user?.nombre ?? `${user?.nombres ?? ""} ${user?.apellidos ?? ""}`.trim();
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
 
-  // cargar proveedores una sola vez
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await ServiceProveedor.getAll();
-        const list = Array.isArray(res) ? res : res.items || [];
-        setProveedores(list);
-      } catch (e) {
-        console.error("Error cargando proveedores:", e);
-      }
-    })();
-  }, []);
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState(null);
 
-  const getProveedorNombre = (id) => {
-    if (!id) return "—";
-    const p = proveedores.find((x) => x.id === id);
-    return p ? p.razonSocial : id;
+  const [showDetails, setShowDetails] = useState(false);
+  const [showMovimientos, setShowMovimientos] = useState(false);
+
+  // ✅ servicio que usará el Grid según el rol
+  const serviceForGrid =
+    roleKey === "pilotero" && empleadoId
+      ? {
+          // copiamos el servicio original
+          ...ServiceImportacion,
+          // y sobreescribimos getAll SOLO para piloto
+          getAll: async (...args) => {
+            try {
+              const data = await ServiceImportacion.getByEmpleado(empleadoId);
+              return data;
+            } catch (e) {
+              console.error("Error cargando importaciones del pilotero:", e);
+              throw e;
+            }
+          },
+        }
+      : ServiceImportacion;
+
+  // 🔁 refrescar grilla
+  const refetchGrid = () => {
+    try {
+      gridRef.current?.refetch?.();
+    } catch (e) {
+      console.error("No se pudo recargar la grilla de importaciones:", e);
+    }
   };
 
-  const columns = [
-    { name: "Código", selector: (r) => r.codigo ?? "—", sortable: true, minWidth: "140px" },
-    {
-      name: "Proveedor",
-      selector: (r) => getProveedorNombre(r.proveedorId),
-      sortable: true,
-      minWidth: "180px",
-    },
-    {
-      name: "Fecha llegada",
-      selector: (r) => (r.fechaLlegada ? new Date(r.fechaLlegada).toLocaleDateString() : "—"),
-      sortable: true,
-      minWidth: "150px",
-    },
-    { name: "Estado", selector: (r) => r.estado ?? "—", sortable: true, minWidth: "140px" },
-    { name: "Observaciones", selector: (r) => r.observaciones ?? "—", minWidth: "240px", grow: 2 },
-  ];
+  // NUEVA IMPORTACIÓN
+  const handleNew = () => {
+    setFormData(null);
+    setShowForm(true);
+  };
 
-  const detailsFields = [
-  { label: "Código", key: "codigo" },
-  {
-    label: "Proveedor",
-    key: "proveedorId",
-    format: (v) => getProveedorNombre(v),
-  },
-  {
-    label: "Fecha llegada",
-    key: "fechaLlegada",
-    format: (v) => (v ? new Date(v).toLocaleString() : "—"),
-  },
-  { label: "Estado", key: "estado" },
-  { label: "Observaciones", key: "observaciones" },
-  {
-    label: "Registrado por",
-    key: "empleadoNombre", // 👈 porque lo acabamos de inyectar arriba
-    format: (v, row) =>
-      v ??
-      row?.usuarioNombre ??
-      (row?.empleadoId ? `ID: ${row.empleadoId}` : "—"),
-  },
-  {
-    label: "Fecha Registro",
-    key: "fechaRegistro",
-    format: (v) => (v ? new Date(v).toLocaleString() : "—"),
-  },
-];
-
-
+  // EDITAR
   const handleEdit = (row) => {
     setFormData(row);
     setShowForm(true);
   };
 
-  const handleDelete = async () => {
-    try {
-      await ServiceImportacion.remove(idToDelete);
-      toast.success("Importación eliminada");
-      gridRef.current?.refetch();
-      setIdToDelete(null);
-    } catch (e) {
-      console.error(e);
-      throw e;
-    }
+  // DETALLE
+  const handleView = (row) => {
+    setSelectedRow(row);
+    setSelectedId(row.id);
+    setShowDetails(true);
   };
 
-  return (
-    <div className="flex flex-col gap-y-6 p-4 sm:p-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-            Gestión de Importaciones
-          </h1>
-          
-        </div>
+  // MOVIMIENTO / SEGUIMIENTO
+  const handleMovimientos = (row) => {
+    setSelectedRow(row);
+    setShowMovimientos(true);
+  };
 
-        {canCreate && (
-          <button
-            onClick={() => {
-              setFormData(null);
-              setShowForm(true);
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 font-medium"
-          >
+  // CIERRES
+  const handleCloseForm = () => {
+    setShowForm(false);
+    setFormData(null);
+  };
+
+  const handleCloseDetails = () => {
+    setShowDetails(false);
+    setSelectedRow(null);
+    setSelectedId(null);
+  };
+
+  const handleCloseMovimientos = () => {
+    setShowMovimientos(false);
+    setSelectedRow(null);
+  };
+
+  const handleSuccessForm = () => {
+    handleCloseForm();
+    refetchGrid();
+  };
+
+  const handleUpdatedMovimientos = () => {
+    refetchGrid();
+    toast.info("Seguimiento de importación actualizado");
+  };
+
+  // 🔹 Columnas de la tabla
+  const columns = [
+    {
+      name: "Código",
+      selector: (row) => row.codigo || `IMP-${row.id}`,
+      minWidth: "150px",
+    },
+    {
+      name: "Proveedor",
+      selector: (row) => row.proveedorId,
+      minWidth: "120px",
+    },
+    {
+      name: "Fecha Registro",
+      selector: (row) =>
+        row.fechaRegistro
+          ? new Date(row.fechaRegistro).toLocaleDateString()
+          : "",
+      minWidth: "160px",
+    },
+    {
+      name: "Fecha Llegada Estimada",
+      selector: (row) =>
+        row.fechaLlegada ? new Date(row.fechaLlegada).toLocaleDateString() : "",
+      minWidth: "190px",
+    },
+    {
+      name: "Descripción",
+      selector: (row) => row.descripcion || "",
+      minWidth: "200px",
+    },
+    {
+      name: "Empleado asignado",
+      selector: (row) => row.idEmpleadoAsignado || "",
+      minWidth: "160px",
+    },
+    {
+      name: "Estado",
+      selector: (row) => row.estado,
+      minWidth: "130px",
+      cell: (row) => {
+        const activo = Number(row.estado) === 1;
+        return (
+          <Chip
+            size="small"
+            label={activo ? "Activa" : "Cerrada"}
+            color={activo ? "success" : "default"}
+            variant={activo ? "filled" : "outlined"}
+          />
+        );
+      },
+    },
+  ];
+
+  // 🔹 Campos para el DetailsDialog
+  const detailFields = [
+    { key: "codigo", label: "Código" },
+    { key: "proveedorId", label: "Proveedor (ID)" },
+    {
+      key: "fechaRegistro",
+      label: "Fecha Registro",
+      format: (v) => (v ? new Date(v).toLocaleString() : ""),
+    },
+    {
+      key: "fechaLlegada",
+      label: "Fecha Llegada Estimada",
+      format: (v) => (v ? new Date(v).toLocaleDateString() : ""),
+    },
+    { key: "descripcion", label: "Descripción" },
+    { key: "idEmpleadoAsignado", label: "Empleado asignado (ID)" },
+    {
+      key: "estado",
+      label: "Estado",
+      format: (v) => (Number(v) === 1 ? "Activa" : "Cerrada"),
+    },
+  ];
+
+  // 🔹 Botones de acción por fila
+  const renderActions = (row) => (
+    <>
+      <Tooltip title="Ver detalles">
+        <IconButton size="small" onClick={() => handleView(row)}>
+          <Eye size={18} />
+        </IconButton>
+      </Tooltip>
+
+      {canEdit && (
+        <Tooltip title="Editar importación">
+          <IconButton size="small" onClick={() => handleEdit(row)}>
             <PencilLine size={18} />
-            Nueva Importación
-          </button>
-        )}
-      </div>
-
-      {/* Grid */}
-      <GridGenerico
-        ref={gridRef}
-        service={{
-          // sobreescribimos create/update para enviar el usuario
-          ...ServiceImportacion,
-          create: async (data) => {
-            const payload = {
-              ...data,
-              empleadoId: data.empleadoId ?? usuarioIdLogueado ?? null,
-            };
-            return ServiceImportacion.create(payload);
-          },
-          update: async (id, data) => {
-            const payload = {
-              ...data,
-              empleadoId: data.empleadoId ?? usuarioIdLogueado ?? null,
-            };
-            return ServiceImportacion.update(id, payload);
-          },
-        }}
-        columns={columns}
-        title="Importaciones"
-        defaultSortField="fechaRegistro"
-        defaultSortAsc={false}
-        pageSize={10}
-        renderActions={(row) => (
-          <div className="flex gap-x-2 justify-end">
-            {/* ver detalles: todos */}
-            <button
-              className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors duration-200"
-              onClick={() => setSelectedId(row.id)}
-              title="Ver detalles"
-            >
-              <Eye size={16} />
-            </button>
-
-            {/* editar: solo admin */}
-            {canEdit && (
-              <button
-                className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors duration-200"
-                onClick={() => handleEdit(row)}
-                title="Editar"
-              >
-                <PencilLine size={16} />
-              </button>
-            )}
-
-            {/* eliminar: solo admin */}
-            {canDelete && (
-              <button
-                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duración-200"
-                onClick={() => setIdToDelete(row.id)}
-                title="Eliminar"
-              >
-                <Trash size={16} />
-              </button>
-            )}
-          </div>
-        )}
-      />
-
-      <Details
-        open={!!selectedId}
-        id={selectedId}
-        fetchData={async (id) => {
-          // 1. traer la importación
-          const imp = await ServiceImportacion.getById(id);
-
-          // 2. si tiene empleadoId, intentamos traer su nombre
-          if (imp?.empleadoId) {
-            try {
-              const emp = await ServiceEmpleado.getById(imp.empleadoId);
-              // normalizamos a un campo que ya buscamos en detailsFields
-              return {
-                ...imp,
-                empleadoNombre: emp?.nombre ?? emp?.nombres ?? null,
-              };
-            } catch (e) {
-              // si falla, devolvemos igual la importación
-              return imp;
-            }
-          }
-
-          return imp;
-        }}
-        fields={detailsFields}
-        onClose={() => setSelectedId(null)}
-      />
-
-      {/* Confirmación eliminar */}
-      {idToDelete && canDelete && (
-        <DeleteConfirm
-          title="¿Eliminar importación?"
-          message="Esta acción eliminará la importación y no se podrá deshacer."
-          onConfirm={handleDelete}
-          onCancel={() => setIdToDelete(null)}
-        />
+          </IconButton>
+        </Tooltip>
       )}
 
-      {/* Formulario */}
+      <Tooltip title="Seguimiento / Movimiento">
+        <IconButton size="small" onClick={() => handleMovimientos(row)}>
+          <Route size={18} />
+        </IconButton>
+      </Tooltip>
+    </>
+  );
+
+  return (
+    <>
+      {/* 🔹 Encabezado */}
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems="center"
+        mb={2}
+      >
+        <Typography variant="h5" fontWeight={600}>
+          Importaciones
+        </Typography>
+
+        {/* 🔹 Botón para agregar importación */}
+        {canCreate && (
+          <Button
+            variant="contained"
+            startIcon={<Plus size={18} />}
+            onClick={handleNew}
+            sx={{
+              textTransform: "none",
+              fontWeight: 600,
+              borderRadius: 2,
+              px: 2.5,
+              py: 1,
+              backgroundColor: "#8b5e83",
+              "&:hover": {
+                backgroundColor: "#72486a",
+              },
+            }}
+          >
+            Nueva Importación
+          </Button>
+        )}
+      </Box>
+
+      {/* Grilla principal */}
+      <GridGenerico
+        ref={gridRef}
+        title="Listado de Importaciones"
+        service={serviceForGrid}   
+        columns={columns}
+        renderActions={renderActions}
+      />
+
+      {/* Modal: Crear / Editar */}
       {showForm && (
         <ImportacionForm
           open={showForm}
+          onClose={handleCloseForm}
           initialData={formData}
-          onClose={() => setShowForm(false)}
-          onSuccess={() => {
-            gridRef.current?.refetch();
-            setShowForm(false);
-          }}
-          // si tu form necesita saber quién es el usuario
-          usuarioId={usuarioIdLogueado}
+          onSuccess={handleSuccessForm}
         />
       )}
-    </div>
+
+      {/* Modal: Detalles */}
+      {showDetails && selectedId && (
+        <DetailsDialog
+          open={showDetails}
+          id={selectedId}
+          fields={detailFields}
+          fetchData={ServiceImportacion.getById}
+          onClose={handleCloseDetails}
+        />
+      )}
+
+      {/* Modal: Seguimiento / Movimiento */}
+      {showMovimientos && selectedRow && (
+        <MovimientoImportacionDialog
+          open={showMovimientos}
+          onClose={handleCloseMovimientos}
+          importacion={selectedRow}
+          onUpdated={handleUpdatedMovimientos}
+        />
+      )}
+    </>
   );
 };
 

@@ -1,3 +1,4 @@
+// src/context/AuthContext.jsx
 import { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -5,33 +6,58 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true); // indica si estamos cargando el usuario desde localStorage
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // 🔁 Cargar usuario si está guardado en localStorage
+  // 🔁 Cargar usuario desde localStorage al iniciar
   useEffect(() => {
     try {
       const storedUser = localStorage.getItem("user");
-      if (storedUser) setUser(JSON.parse(storedUser));
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+
+        // nos aseguramos de que tenga la misma forma que usamos en el app
+        const normalizedUser = {
+          ...parsed,
+          nombreCompleto:
+            parsed.nombreCompleto ||
+            `${parsed.nombre || ""} ${parsed.apellido || ""}`.trim(),
+        };
+
+        setUser(normalizedUser);
+      }
     } catch (err) {
-      // ignore parse errors
       console.error("Error reading stored user:", err);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // ✅ Login: guarda usuario
-  const login = (userData) => {
+
+  const login = (apiUser) => {
+    // apiUser viene de FASTAPI: {id, nombre, apellido, rol, correo, usuario, idSucursal}
+
+    const userData = {
+      id: apiUser.id,
+      nombre: apiUser.nombre,
+      apellido: apiUser.apellido,
+      nombreCompleto: `${apiUser.nombre} ${apiUser.apellido}`.trim(),
+      rol: apiUser.rol,
+      correo: apiUser.correo,
+      usuario: apiUser.usuario,
+      idSucursal: apiUser.idSucursal,   // 👈👈👈 IMPORTANTE
+    };
+
     try {
       localStorage.setItem("user", JSON.stringify(userData));
     } catch (err) {
       console.error("Error saving user to localStorage:", err);
     }
+
     setUser(userData);
   };
 
-  // 🚪 Logout: borra usuario y redirige al login
+
   const logout = () => {
     try {
       localStorage.removeItem("user");
@@ -49,5 +75,4 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-// Hook para usar el contexto
 export const useAuth = () => useContext(AuthContext);

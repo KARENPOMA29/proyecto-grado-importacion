@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import {
   Dialog,
@@ -20,15 +21,11 @@ const ProductoForm = ({ initialData = null, onClose, onSuccess }) => {
     numeroSerie: initialData?.numeroSerie || "",
     descripcion: initialData?.descripcion || "",
     precio: initialData?.precio || "",
-    color: initialData?.color || "",
-    duracionGarantia: initialData?.duracionGarantia || "",
-    tipoGarantia: initialData?.tipoGarantia || "",
     categoriaId: initialData?.categoriaId || "",
     modeloId: initialData?.modeloId || "",
     importacionId: initialData?.importacionId || "",
   });
 
-  // catálogos
   const [modelos, setModelos] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [importaciones, setImportaciones] = useState([]);
@@ -58,24 +55,18 @@ const ProductoForm = ({ initialData = null, onClose, onSuccess }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async () => {
     try {
-      // opcional: convertir precio a número
       const payload = {
-        ...form,
-        precio: form.precio === "" ? null : Number(form.precio),
-        duracionGarantia:
-          form.duracionGarantia === "" ? null : Number(form.duracionGarantia),
-        categoriaId: form.categoriaId === "" ? null : Number(form.categoriaId),
-        modeloId: form.modeloId === "" ? null : Number(form.modeloId),
-        importacionId:
-          form.importacionId === "" ? null : Number(form.importacionId),
+        numeroSerie: form.numeroSerie.trim(),
+        descripcion: form.descripcion.trim(),
+        precio: form.precio ? Number(form.precio) : 0,
+        categoriaId: Number(form.categoriaId),
+        modeloId: Number(form.modeloId),
+        importacionId: form.importacionId ? Number(form.importacionId) : null,
       };
 
       if (initialData) {
@@ -85,6 +76,7 @@ const ProductoForm = ({ initialData = null, onClose, onSuccess }) => {
         await ServiceProducto.create(payload);
         toast.success("Producto creado correctamente");
       }
+
       onSuccess?.();
       onClose?.();
     } catch (error) {
@@ -128,50 +120,15 @@ const ProductoForm = ({ initialData = null, onClose, onSuccess }) => {
             <TextField
               label="Precio"
               name="precio"
+              type="number"
               value={form.precio}
               onChange={handleChange}
-              type="number"
               fullWidth
               size="small"
               inputProps={{ step: "0.01" }}
             />
           </Grid>
 
-          <Grid item xs={12} sm={6}>
-            <TextField
-              label="Color"
-              name="color"
-              value={form.color}
-              onChange={handleChange}
-              fullWidth
-              size="small"
-            />
-          </Grid>
-
-          <Grid item xs={12} sm={6}>
-            <TextField
-              label="Duración Garantía"
-              name="duracionGarantia"
-              value={form.duracionGarantia}
-              onChange={handleChange}
-              type="number"
-              fullWidth
-              size="small"
-            />
-          </Grid>
-
-          <Grid item xs={12} sm={6}>
-            <TextField
-              label="Tipo de Garantía"
-              name="tipoGarantia"
-              value={form.tipoGarantia}
-              onChange={handleChange}
-              fullWidth
-              size="small"
-            />
-          </Grid>
-
-          {/* 👇 CATEGORÍA COMO COMBO */}
           <Grid item xs={12} sm={6}>
             <TextField
               select
@@ -185,14 +142,12 @@ const ProductoForm = ({ initialData = null, onClose, onSuccess }) => {
               <MenuItem value="">-- Seleccionar --</MenuItem>
               {categorias.map((cat) => (
                 <MenuItem key={cat.id} value={cat.id}>
-                  {/* ajusta a cat.nombreCategoria si tu API devuelve así */}
                   {cat.nombre || cat.nombreCategoria || `Cat ${cat.id}`}
                 </MenuItem>
               ))}
             </TextField>
           </Grid>
 
-          {/* 👇 MODELO COMO COMBO */}
           <Grid item xs={12} sm={6}>
             <TextField
               select
@@ -212,7 +167,6 @@ const ProductoForm = ({ initialData = null, onClose, onSuccess }) => {
             </TextField>
           </Grid>
 
-          {/* 👇 IMPORTACIÓN COMO COMBO */}
           <Grid item xs={12} sm={6}>
             <TextField
               select
@@ -226,7 +180,6 @@ const ProductoForm = ({ initialData = null, onClose, onSuccess }) => {
               <MenuItem value="">-- Seleccionar --</MenuItem>
               {importaciones.map((imp) => (
                 <MenuItem key={imp.id} value={imp.id}>
-                  {/* cambia a imp.codigoImportacion si tu API lo manda así */}
                   {imp.codigo || imp.codigoImportacion || `IMP-${imp.id}`}
                 </MenuItem>
               ))}
@@ -234,6 +187,7 @@ const ProductoForm = ({ initialData = null, onClose, onSuccess }) => {
           </Grid>
         </Grid>
       </DialogContent>
+
       <DialogActions sx={{ p: 2 }}>
         <Button onClick={onClose} color="secondary">
           Cancelar
