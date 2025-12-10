@@ -29,9 +29,12 @@ export const adminMenu = [
 
   // SISTEMA
   { label: "Reportes", icon: AssessmentIcon, to: "/admin/reportes", group: "Sistema" },
-  { label: "Configuración", icon: SettingsIcon, to: "/admin/configuracion", group: "Sistema" },
-];
 
+  { label: "Reporte de Ventas", icon: AssessmentIcon, to: "/admin/reportes/ventas", group: "Sistema" },
+  { label: "Reporte de Inventario", icon: AssessmentIcon, to: "/admin/reportes/inventario", group: "Sistema" },
+
+  { label: "Configuración", icon: SettingsIcon, to: "/admin/configuracion", group: "Sistema" },
+  ];
 // --- VENTAS ---
 export const ventasMenu = [
   // PRINCIPAL
