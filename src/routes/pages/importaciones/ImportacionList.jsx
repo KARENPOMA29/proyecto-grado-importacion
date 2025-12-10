@@ -35,11 +35,9 @@ const ImportacionList = () => {
   const empleadoId = user?.id;
 
   // 👇 permisos por rol
-  const canCreate =
-    roleKey === "administrador" ||
-    roleKey === "almacen";
+  const canCreate = roleKey === "administrador" || roleKey === "almacen";
   const canEdit = roleKey === "administrador";
-  const canDelete = roleKey === "administrador";
+  const canDelete = roleKey === "administrador"; // por si luego lo usas
 
   const [selectedRow, setSelectedRow] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
@@ -56,7 +54,7 @@ const ImportacionList = () => {
       ? {
           // copiamos el servicio original
           ...ServiceImportacion,
-          // y sobreescribimos getAll SOLO para piloto
+          // y sobreescribimos getAll SOLO para pilotero
           getAll: async (...args) => {
             try {
               const data = await ServiceImportacion.getByEmpleado(empleadoId);
@@ -130,6 +128,14 @@ const ImportacionList = () => {
     toast.info("Seguimiento de importación actualizado");
   };
 
+  // 🔸 Solo se puede editar si:
+  // - el rol tiene permiso (canEdit)
+  // - y la importación está ACTIVA (estado = 1)
+  const canEditRow = (row) => {
+    const estado = Number(row.estado);
+    return canEdit && estado === 1;
+  };
+
   // 🔹 Columnas de la tabla
   const columns = [
     {
@@ -139,45 +145,58 @@ const ImportacionList = () => {
     },
     {
       name: "Proveedor",
-      selector: (row) => row.proveedorId,
-      minWidth: "120px",
-    },
-    {
-      name: "Fecha Registro",
       selector: (row) =>
-        row.fechaRegistro
-          ? new Date(row.fechaRegistro).toLocaleDateString()
-          : "",
+        row.proveedor?.razonSocial || `ID: ${row.proveedorId}`,
       minWidth: "160px",
     },
+
     {
       name: "Fecha Llegada Estimada",
       selector: (row) =>
-        row.fechaLlegada ? new Date(row.fechaLlegada).toLocaleDateString() : "",
+        row.fechaLlegada
+          ? new Date(row.fechaLlegada).toLocaleDateString()
+          : "",
       minWidth: "190px",
     },
     {
-      name: "Descripción",
-      selector: (row) => row.descripcion || "",
-      minWidth: "200px",
-    },
-    {
       name: "Empleado asignado",
-      selector: (row) => row.idEmpleadoAsignado || "",
-      minWidth: "160px",
+      selector: (row) => {
+        if (row.empleadoAsignado) {
+          const { nombre, apellido } = row.empleadoAsignado;
+          return `${nombre || ""} ${apellido || ""}`.trim();
+        }
+        return `ID: ${row.idEmpleadoAsignado}`;
+      },
+      minWidth: "180px",
     },
     {
       name: "Estado",
       selector: (row) => row.estado,
       minWidth: "130px",
       cell: (row) => {
-        const activo = Number(row.estado) === 1;
+        const estado = Number(row.estado);
+        let label = "";
+        let color = "default";
+        let variant = "filled";
+
+        if (estado === 1) {
+          label = "Activa";
+          color = "success";
+        } else if (estado === 2) {
+          label = "Concluida";
+          color = "info";
+        } else {
+          label = "Cerrada";
+          color = "default";
+          variant = "outlined";
+        }
+
         return (
           <Chip
             size="small"
-            label={activo ? "Activa" : "Cerrada"}
-            color={activo ? "success" : "default"}
-            variant={activo ? "filled" : "outlined"}
+            label={label}
+            color={color}
+            variant={variant}
           />
         );
       },
@@ -187,7 +206,12 @@ const ImportacionList = () => {
   // 🔹 Campos para el DetailsDialog
   const detailFields = [
     { key: "codigo", label: "Código" },
-    { key: "proveedorId", label: "Proveedor (ID)" },
+    {
+      key: "proveedor",
+      label: "Proveedor",
+      format: (v, row) =>
+        row?.proveedor?.razonSocial || `ID: ${row?.proveedorId ?? ""}`,
+    },
     {
       key: "fechaRegistro",
       label: "Fecha Registro",
@@ -199,11 +223,26 @@ const ImportacionList = () => {
       format: (v) => (v ? new Date(v).toLocaleDateString() : ""),
     },
     { key: "descripcion", label: "Descripción" },
-    { key: "idEmpleadoAsignado", label: "Empleado asignado (ID)" },
+    {
+      key: "empleadoAsignado",
+      label: "Empleado asignado",
+      format: (v, row) => {
+        if (row?.empleadoAsignado) {
+          const { nombre, apellido } = row.empleadoAsignado;
+          return `${nombre || ""} ${apellido || ""}`.trim();
+        }
+        return `ID: ${row?.idEmpleadoAsignado ?? ""}`;
+      },
+    },
     {
       key: "estado",
       label: "Estado",
-      format: (v) => (Number(v) === 1 ? "Activa" : "Cerrada"),
+      format: (v) => {
+        const estado = Number(v);
+        if (estado === 1) return "Activa";
+        if (estado === 2) return "Concluida";
+        return "Cerrada";
+      },
     },
   ];
 
@@ -216,7 +255,7 @@ const ImportacionList = () => {
         </IconButton>
       </Tooltip>
 
-      {canEdit && (
+      {canEditRow(row) && (
         <Tooltip title="Editar importación">
           <IconButton size="small" onClick={() => handleEdit(row)}>
             <PencilLine size={18} />
@@ -224,7 +263,13 @@ const ImportacionList = () => {
         </Tooltip>
       )}
 
-      <Tooltip title="Seguimiento / Movimiento">
+      <Tooltip
+        title={
+          Number(row.estado) === 2
+            ? "Importación concluida (solo seguimiento)"
+            : "Seguimiento / Movimiento"
+        }
+      >
         <IconButton size="small" onClick={() => handleMovimientos(row)}>
           <Route size={18} />
         </IconButton>
@@ -272,7 +317,7 @@ const ImportacionList = () => {
       <GridGenerico
         ref={gridRef}
         title="Listado de Importaciones"
-        service={serviceForGrid}   
+        service={serviceForGrid}
         columns={columns}
         renderActions={renderActions}
       />
