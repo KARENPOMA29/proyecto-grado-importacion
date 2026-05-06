@@ -206,119 +206,124 @@ const ClienteForm = ({ onClose, onSuccess, initialData = null }) => {
 
   return (
     <Dialog
-      open={true}
+      open
       onClose={onClose}
       maxWidth="sm"
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 2,
-          overflow: "visible",
+          borderRadius: 3,
+          overflow: "hidden",
+          boxShadow: "0 12px 36px rgba(0,0,0,0.18)",
         },
       }}
     >
       <DialogTitle
-        sx={{ borderBottom: "1px solid", borderColor: "divider", pb: 2 }}
+        sx={{
+          p: 2.5,
+          pb: 2,
+          background: "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
+          color: "#F5F5F5",
+        }}
       >
-        <Typography variant="h6" fontWeight={600}>
+        <Typography variant="h6" fontWeight={700}>
           {initialData ? "Editar Cliente" : "Nuevo Cliente"}
+        </Typography>
+        <Typography variant="body2" sx={{ opacity: 0.9, mt: 0.5 }}>
+          Complete la información comercial del cliente.
         </Typography>
       </DialogTitle>
 
-      <DialogContent
-        sx={{
-          py: 3,
-          overflow: "visible",
-          maxHeight: "65vh",
-        }}
-      >
-        <Box component="form" onSubmit={handleSubmit} noValidate>
+      <DialogContent sx={{ py: 3, px: 3, bgcolor: "#FAFAFA" }}>
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
+          noValidate
+          sx={{
+            bgcolor: "#FFFFFF",
+            borderRadius: 2,
+            p: 2.5,
+            boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+          }}
+        >
           <Grid container spacing={2}>
-            {/* NIT primero */}
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="NIT"
-                value={form.nit}
-                onChange={(e) => handleChange("nit", e.target.value)}
-                error={
+            {[
+              {
+                field: "nit",
+                label: "NIT",
+                value: form.nit,
+                error:
                   touched.nit &&
-                  (!!nitError || !/^\d{3,15}$/.test(form.nit))
-                }
-                helperText={
-                  nitError
-                    ? nitError
-                    : touched.nit && !/^\d{3,15}$/.test(form.nit)
+                  (!!nitError || !/^\d{3,15}$/.test(form.nit)),
+                helper:
+                  nitError ||
+                  (touched.nit && !/^\d{3,15}$/.test(form.nit)
                     ? "Debe ser numérico (3 a 15 dígitos)"
-                    : ""
-                }
-                required
-                disabled={loading}
-                InputProps={{
-                  endAdornment: checkingNit ? (
-                    <CircularProgress size={20} />
-                  ) : null,
-                }}
-                inputProps={{ maxLength: 15 }}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Razón Social"
-                value={form.razonSocial}
-                onChange={(e) => handleChange("razonSocial", e.target.value)}
-                error={touched.razonSocial && !form.razonSocial}
-                helperText={
+                    : "Obligatorio"),
+                props: {
+                  inputProps: { maxLength: 15 },
+                  InputProps: {
+                    endAdornment: checkingNit ? (
+                      <CircularProgress size={18} />
+                    ) : null,
+                  },
+                },
+              },
+              {
+                field: "razonSocial",
+                label: "Razón Social",
+                value: form.razonSocial,
+                error: touched.razonSocial && !form.razonSocial,
+                helper:
                   touched.razonSocial && !form.razonSocial
                     ? "Campo requerido"
-                    : ""
-                }
-                required
-                disabled={loading}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Teléfono"
-                value={form.telefono}
-                onChange={(e) => handleChange("telefono", e.target.value)}
-                error={touched.telefono && !/^\d{7,8}$/.test(form.telefono)}
-                helperText={
+                    : "Obligatorio",
+              },
+              {
+                field: "telefono",
+                label: "Teléfono",
+                value: form.telefono,
+                error:
+                  touched.telefono && !/^\d{7,8}$/.test(form.telefono),
+                helper:
                   touched.telefono && !/^\d{7,8}$/.test(form.telefono)
                     ? "Debe tener 7 u 8 dígitos"
-                    : ""
-                }
-                required
-                disabled={loading}
-                inputProps={{ maxLength: 8 }}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                type="email"
-                label="Correo electrónico"
-                value={form.correo}
-                onChange={(e) => handleChange("correo", e.target.value)}
-                error={
+                    : "Obligatorio",
+                props: { inputProps: { maxLength: 8 } },
+              },
+              {
+                field: "correo",
+                label: "Correo electrónico",
+                value: form.correo,
+                type: "email",
+                error:
                   touched.correo &&
-                  (!form.correo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo))
-                }
-                helperText={
+                  (!form.correo ||
+                    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo)),
+                helper:
                   touched.correo &&
-                  (!form.correo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo))
+                  (!form.correo ||
+                    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo))
                     ? "Ingrese un correo válido"
-                    : ""
-                }
-                required
-                disabled={loading}
-              />
-            </Grid>
+                    : "Obligatorio",
+              },
+            ].map((item) => (
+              <Grid item xs={12} sm={6} key={item.field}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  type={item.type || "text"}
+                  label={item.label}
+                  value={item.value}
+                  onChange={(e) => handleChange(item.field, e.target.value)}
+                  error={!!item.error}
+                  helperText={item.helper}
+                  required
+                  disabled={loading}
+                  {...(item.props || {})}
+                />
+              </Grid>
+            ))}
           </Grid>
 
           {formError && (
@@ -329,15 +334,43 @@ const ClienteForm = ({ onClose, onSuccess, initialData = null }) => {
         </Box>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
-        <Button onClick={onClose} variant="outlined" disabled={loading}>
+      <DialogActions sx={{ px: 3, py: 2.5, gap: 1.5 }}>
+        <Button
+          onClick={onClose}
+          variant="outlined"
+          disabled={loading}
+          sx={{
+            textTransform: "none",
+            borderRadius: 999,
+            px: 3,
+            borderColor: "#e0e0e0",
+            color: "rgba(0,0,0,0.7)",
+            "&:hover": {
+              borderColor: "#d32f2f",
+              color: "#d32f2f",
+              backgroundColor: "rgba(211,47,47,0.04)",
+            },
+          }}
+        >
           Cancelar
         </Button>
+
         <Button
           onClick={handleSubmit}
           variant="contained"
           disabled={loading || nitExists || checkingNit}
-          sx={{ minWidth: 100 }}
+          sx={{
+            textTransform: "none",
+            borderRadius: 999,
+            px: 4,
+            minWidth: 140,
+            fontWeight: 600,
+            background: "linear-gradient(135deg, #14AE5C 0%, #0D8C47 100%)",
+            "&:hover": {
+              background: "linear-gradient(135deg, #0D8C47 0%, #0A6B37 100%)",
+              boxShadow: "0 4px 12px rgba(20,174,92,0.4)",
+            },
+          }}
         >
           {loading ? "Guardando..." : "Guardar"}
         </Button>

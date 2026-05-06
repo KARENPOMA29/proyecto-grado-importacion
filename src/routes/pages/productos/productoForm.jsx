@@ -464,6 +464,7 @@ const ProductoForm = ({ initialData = null, onClose, onSuccess }) => {
               error={!!errors.categoriaId}
               helperText={errors.categoriaId}
               sx={comboStyles}
+              InputLabelProps={{ shrink: true }}
               SelectProps={{
                 displayEmpty: true,
                 MenuProps: {
@@ -545,6 +546,7 @@ const ProductoForm = ({ initialData = null, onClose, onSuccess }) => {
               error={!!errors.modeloId}
               helperText={errors.modeloId}
               sx={comboStyles}
+              InputLabelProps={{ shrink: true }}
               SelectProps={{
                 displayEmpty: true,
                 MenuProps: {
@@ -624,6 +626,7 @@ const ProductoForm = ({ initialData = null, onClose, onSuccess }) => {
               fullWidth
               size="small"
               sx={comboStyles}
+              InputLabelProps={{ shrink: true }}
               SelectProps={{
                 displayEmpty: true,
                 MenuProps: {
@@ -704,6 +707,7 @@ const ProductoForm = ({ initialData = null, onClose, onSuccess }) => {
               size="small"
               error={!!errors.observado}
               helperText={errors.observado}
+              InputLabelProps={{ shrink: true }}
               sx={comboStyles}
               SelectProps={{
                 MenuProps: {

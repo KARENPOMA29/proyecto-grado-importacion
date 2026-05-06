@@ -11,7 +11,7 @@ import StoreIcon from "@mui/icons-material/Store";
 
 export const adminMenu = [
   // PRINCIPAL
-  { label: "Resumen", icon: DashboardIcon, to: "/admin", group: "Principal" },
+  { label: "Alertas", icon: DashboardIcon, to: "/admin", group: "Principal" },
   { label: "Ventas", icon: ShoppingCartIcon, to: "/admin/ventas", group: "Principal" },
   { label: "Importaciones", icon: LocalShippingIcon, to: "/admin/importaciones", group: "Principal" },
   { label: "Entradas", icon: InventoryIcon, to: "/admin/inventario", group: "Principal" },
@@ -28,7 +28,7 @@ export const adminMenu = [
   { label: "Secciones", icon: AssessmentIcon, to: "/admin/secciones", group: "Gestión" },
 
   // SISTEMA
-  { label: "Reportes", icon: AssessmentIcon, to: "/admin/reportes", group: "Sistema" },
+  { label: "Reporte de Importaciones", icon: AssessmentIcon, to: "/admin/reportes", group: "Sistema" },
 
   { label: "Reporte de Ventas", icon: AssessmentIcon, to: "/admin/reportes/ventas", group: "Sistema" },
   { label: "Reporte de Inventario", icon: AssessmentIcon, to: "/admin/reportes/inventario", group: "Sistema" },
@@ -51,11 +51,9 @@ export const ventasMenu = [
 // --- PILOTERO ---
 export const pilotoMenu = [
   // PRINCIPAL
-  { label: "Resumen", icon: DashboardIcon, to: "/pilotero", group: "Principal" },
+
   { label: "Importaciones", icon: LocalShippingIcon, to: "/pilotero/importaciones", group: "Principal" },
   { label: "Proveedores", icon: GroupIcon, to: "/pilotero/proveedores", group: "Principal" },
-  { label: "Rutas y Envíos", icon: InventoryIcon, to: "/pilotero/envios", group: "Principal" },
-  { label: "Estado de Entregas", icon: AssessmentIcon, to: "/pilotero/estado", group: "Principal" },
 ];
 
 

@@ -95,33 +95,43 @@ const GridGenerico = forwardRef(
       }
     };
 
-    // 🔹 Columnas con acciones
-    const columnsWithActions = [
-      ...columns.map((c) => ({
-        ...c,
-        sortable: false,
-        minWidth: c.minWidth || "120px",
-        grow: c.grow ?? 1,
-      })),
-      ...(renderActions
-        ? [
-            {
-              name: "Acciones",
-              id: "acciones",
-              cell: (row) => (
-                <div className="flex flex-nowrap items-center justify-end gap-2 whitespace-nowrap">
-                  {renderActions(row)}
-                </div>
-              ),
-              ignoreRowClick: true,
-              sortable: false,
-              minWidth: "180px",
-              right: true,
-            },
-          ]
-        : []),
-    ];
+    // 🔹 Columnas con acciones   
+  const columnsWithActions = [
+    ...columns.map((c) => {
+      const { minWidth, grow, right, center, width, ...rest } = c;
 
+      return {
+        ...rest,
+        sortable: c.sortable ?? false,
+        minWidth: minWidth || width || "120px",
+        width: width,
+        grow: grow ?? 1,
+        right: right ?? false,
+        center: center ?? false,
+        wrap: true,
+      };
+    }),
+
+    ...(renderActions
+      ? [
+          {
+          name: "Acciones",
+          id: "acciones",
+          cell: (row) => (
+            <div className="flex items-center justify-center gap-2 whitespace-nowrap w-full">
+              {renderActions(row)}
+            </div>
+          ),
+          ignoreRowClick: true,
+          sortable: false,
+          width: "180px",
+          center: true,
+          allowOverflow: true,
+          button: true,
+        }
+        ]
+      : []),
+  ];
     return (
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
         {/* 💡 Escucha el lector de códigos (activo incluso sin foco) */}

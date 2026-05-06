@@ -24,7 +24,13 @@ const CategoriaList = () => {
   const canDelete = roleKey === "administrador";
 
   const columns = [
-    { name: "Nombre", selector: (r) => r.nombre, sortable: true, minWidth: "260px" },
+    {
+      name: "Nombre",
+      selector: (r) => r.nombre,
+      sortable: true,
+      grow: 1,
+      minWidth: "300px",
+    },
   ];
 
   const fields = [
@@ -83,8 +89,7 @@ const CategoriaList = () => {
         defaultSortAsc={true}
         pageSize={10}
         renderActions={(row) => (
-          <div className="flex gap-x-2 justify-end">
-            {/* 👁 ver siempre */}
+          <div className="flex items-center justify-center gap-2 whitespace-nowrap w-full">
             <button
               className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors duration-200"
               onClick={() => setSelectedId(row.id)}
@@ -93,7 +98,6 @@ const CategoriaList = () => {
               <Eye size={16} />
             </button>
 
-            {/* ✏️ editar: Admin + Almacen */}
             {canEdit && (
               <button
                 className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors duration-200"
@@ -104,7 +108,6 @@ const CategoriaList = () => {
               </button>
             )}
 
-            {/* 🗑️ eliminar: solo Admin */}
             {canDelete && (
               <button
                 className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duration-200"

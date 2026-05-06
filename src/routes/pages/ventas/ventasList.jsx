@@ -21,7 +21,7 @@ import {
 } from "@mui/material";
 
 import GridGenerico from "@/components/Grid";
-import DetailsDialog from "@/components/details";
+import VentaDetailsDialog  from "@/components/VentaDetailsDialog";
 import ServiceVentas from "@/services/ServiceVentas";
 import ServiceCliente from "@/services/ServiceCliente";
 import ServiceSucursal from "@/services/ServiceSucursal";
@@ -150,6 +150,7 @@ const VentasList = () => {
   };
 
   const handleGoBack = () => {
+     gridRef.current = null;
     if (step === 1) {
       setStep(0);
       setSelectedCiudad(null);
@@ -240,8 +241,10 @@ const VentasList = () => {
 
   // Refrescar la tabla cuando cambie la sucursal
   useEffect(() => {
-    if (step === 2 && gridRef.current?.refetch) {
-      gridRef.current.refetch();
+    if (step === 2) {
+      setTimeout(() => {
+        gridRef.current?.refetch?.();
+      }, 0);
     }
   }, [selectedSucursal, step]);
 
@@ -727,14 +730,15 @@ const VentasList = () => {
             {/* TABLA */}
             <Box sx={{ width: "100%", overflowX: "auto" }}>
               <Box sx={{ minWidth: 600 }}>
-                <GridGenerico
-                  ref={gridRef}
-                  service={serviceVentasFiltrado}
-                  columns={columns}
-                  defaultSortField="fechaRegistro"
-                  defaultSortAsc={false}
-                  pageSize={10}
-                  renderActions={(row) => (
+                {step === 2 && (
+                  <GridGenerico
+                    ref={gridRef}
+                    service={serviceVentasFiltrado}
+                    columns={columns}
+                    defaultSortField="fechaRegistro"
+                    defaultSortAsc={false}
+                    pageSize={10}
+                    renderActions={(row) => (
                     <Box
                       sx={{
                         display: "flex",
@@ -762,8 +766,9 @@ const VentasList = () => {
                         </IconButton>
                       )}
                     </Box>
-                  )}
-                />
+                    )}
+                  />  
+                )}
               </Box>
             </Box>
           </Box>
@@ -910,14 +915,15 @@ const VentasList = () => {
       )}
 
       {/* CONTENIDO PRINCIPAL */}
-      {renderStep()}
+      <Box key={step}>
+        {renderStep()}
+      </Box>
 
       {/* MODALES */}
-      <DetailsDialog
+      <VentaDetailsDialog
         open={!!selectedId}
         id={selectedId}
         fetchData={ServiceVentas.getById}
-        fields={fields}
         onClose={() => setSelectedId(null)}
       />
 

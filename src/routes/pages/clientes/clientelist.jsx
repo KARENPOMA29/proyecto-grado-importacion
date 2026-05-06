@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { PencilLine, Trash, Eye } from "lucide-react";
+import { Box, Typography, Button } from "@mui/material";
 import GridGenerico from "@/components/Grid";
 import DetailsDialog from "@/components/details";
 import DeleteConfirm from "@/components/deleteConfirm";
@@ -96,28 +97,74 @@ const ClienteList = () => {
       toast.error("Error al cargar datos del cliente");
     }
   };
-
   return (
-    <div className="flex flex-col gap-y-6 p-4 sm:p-6">
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+    <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
+    {/* HEADER */}
+    <Box
+      sx={{
+        mb: 4,
+        display: "flex",
+        flexDirection: { xs: "column", md: "row" },
+        alignItems: { xs: "flex-start", md: "center" },
+        justifyContent: "space-between",
+        gap: 2,
+      }}
+    >
+      {/* TITULOS */}
+      <Box>
+        <Typography
+          variant="h4"
+          sx={{
+            fontWeight: 700,
+            color: "#3A1A1A",
+            mb: 1,
+            lineHeight: 1.1,
+          }}
+        >
           Gestión de Clientes
-        </h1>
+        </Typography>
 
-        {canCreate && (
-          <button
-            onClick={() => {
-              setFormData(null);
-              setShowForm(true);
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 font-medium"
-          >
-            <PencilLine size={18} />
-            Nuevo Cliente
-          </button>
-        )}
-      </div>
+        <Typography
+          variant="body1"
+          sx={{
+            color: "text.secondary",
+            fontSize: "1rem",
+          }}
+        >
+          Administra clientes registrados y consulta su información.
+        </Typography>
+      </Box>
+
+      {/* BOTON */}
+      {canCreate && (
+        <Button
+          variant="contained"
+          onClick={() => {
+            setFormData(null);
+            setShowForm(true);
+          }}
+          startIcon={<PencilLine size={18} />}
+          sx={{
+            borderRadius: 999,
+            px: 3.5,
+            py: 1.3,
+            fontWeight: 700,
+            textTransform: "none",
+            fontSize: "15px",
+            background:
+              "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+            "&:hover": {
+              background:
+                "linear-gradient(135deg, #3A1A1A 0%, #592B2B 100%)",
+              boxShadow: "0 6px 16px rgba(0,0,0,0.35)",
+            },
+          }}
+        >
+          Nuevo Cliente
+        </Button>
+      )}
+    </Box>
 
       <GridGenerico
         ref={gridRef}
@@ -127,8 +174,7 @@ const ClienteList = () => {
         defaultSortAsc={true}
         pageSize={10}
         renderActions={(row) => (
-          <div className="flex gap-x-2 justify-end">
-            {/* 👁 todos pueden ver */}
+          <div className="flex items-center justify-center gap-2 whitespace-nowrap">
             <button
               className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors duration-200"
               onClick={() => setSelectedId(row.id)}
@@ -137,7 +183,6 @@ const ClienteList = () => {
               <Eye size={16} />
             </button>
 
-            {/* ✏️ editar: admin + ventas */}
             {canEdit && (
               <button
                 className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors duration-200"
@@ -148,7 +193,6 @@ const ClienteList = () => {
               </button>
             )}
 
-            {/* 🗑️ eliminar: solo admin */}
             {canDelete && (
               <button
                 className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duration-200"
@@ -189,7 +233,7 @@ const ClienteList = () => {
           }}
         />
       )}
-    </div>
+    </Box>
   );
 };
 

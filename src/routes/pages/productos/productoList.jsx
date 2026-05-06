@@ -696,8 +696,6 @@ const ProductList = () => {
           overflow: "hidden"
         }}
       >
-        <Box sx={{ width: "100%", overflowX: "auto" }}>
-          <Box sx={{ minWidth: 1000 }}>
             <GridGenerico
               key={reloadKey}
               ref={gridRef}
@@ -709,8 +707,6 @@ const ProductList = () => {
               defaultSortField="fechaRegistro"
               defaultSortAsc={false}
             />
-          </Box>
-        </Box>
       </Card>
 
       {/* MODALES */}

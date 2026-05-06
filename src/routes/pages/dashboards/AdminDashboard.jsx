@@ -14,11 +14,18 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
-  Button,            // 👈 agregado
+  Button,
+  Chip, // ✅ AGREGADO
+  Stack, // ✅ AGREGADO
+  Switch, // ✅ AGREGADO
+  FormControlLabel, // ✅ AGREGADO
+  TextField, // ✅ AGREGADO
 } from "@mui/material";
 
-
 import NotificationsActiveOutlinedIcon from "@mui/icons-material/NotificationsActiveOutlined";
+import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined"; // ✅ AGREGADO
+import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined"; // ✅ AGREGADO
+import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined"; // ✅ AGREGADO
 
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { adminMenu } from "./menuConfig";
@@ -38,7 +45,6 @@ import VentasList from "@/routes/pages/ventas/ventasList";
 import ProductList from "@/routes/pages/productos/productoList";
 import Reporte_Venta from "@/routes/pages/reportes/Reporte_Venta";
 import Reporte_Inventario from "@/routes/pages/reportes/Reporte_Inventario";
-
 
 const Reportes = () => (
   <>
@@ -61,6 +67,31 @@ const Configuracion = () => (
 export default function AdminDashboard() {
   const [alertas, setAlertas] = React.useState([]);
   const [openNotif, setOpenNotif] = React.useState(false);
+
+  // ✅ AGREGADO: datos solo visuales para alertas de stock bajo por modelo
+  const alertasStockBajoMock = [
+    {
+      id: 1,
+      modelo: "Refrigerador LG Smart 420L",
+      sucursal: "Sucursal Central",
+      stockActual: 2,
+      stockMinimo: 5,
+    },
+    {
+      id: 2,
+      modelo: "Lavadora Samsung EcoBubble 18Kg",
+      sucursal: "Sucursal Norte",
+      stockActual: 1,
+      stockMinimo: 4,
+    },
+    {
+      id: 3,
+      modelo: "Cocina Mabe Inox 6 Hornallas",
+      sucursal: "Sucursal Sur",
+      stockActual: 3,
+      stockMinimo: 6,
+    },
+  ];
 
   React.useEffect(() => {
     const loadAlertas = async () => {
@@ -160,121 +191,282 @@ export default function AdminDashboard() {
 
                     <Divider sx={{ mb: 1.5 }} />
 
-                      {alertas.length === 0 ? (
-                        <Typography color="text.secondary" variant="body2">
-                          No hay nuevas alertas por ahora.
-                        </Typography>
-                      ) : (
-                        <List dense sx={{ mt: 0.5 }}>
-                          {alertas.map((a, index) => {
-                            const fechaFormato = new Date(a.fecha).toLocaleString("es-BO", {
-                              day: "2-digit",
-                              month: "2-digit",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            });
+                    {alertas.length === 0 ? (
+                      <Typography color="text.secondary" variant="body2">
+                        No hay nuevas alertas por ahora.
+                      </Typography>
+                    ) : (
+                      <List dense sx={{ mt: 0.5 }}>
+                        {alertas.map((a, index) => {
+                          const fechaFormato = new Date(a.fecha).toLocaleString("es-BO", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          });
 
-                            const esMasReciente = index === 0;
+                          const esMasReciente = index === 0;
 
-                            return (
-                              <ListItem
-                                key={a.id}
-                                alignItems="flex-start"
-                                sx={{
-                                  mb: 1,
-                                  px: 1.5,
-                                  py: 1.1,
-                                  borderRadius: 1.5,
-                                  bgcolor: esMasReciente ? "action.hover" : "transparent",
-                                  "&:hover": {
-                                    bgcolor: "action.hover",
-                                  },
-                                  transition: "background-color 0.2s ease",
-                                }}
-                              >
-                                <ListItemIcon sx={{ minWidth: 32, mt: 0.2 }}>
-                                  <NotificationsActiveOutlinedIcon
-                                    fontSize="small"
-                                    sx={{ color: "text.secondary" }}
-                                  />
-                                </ListItemIcon>
-                               <ListItemText
-                                  primary={
-                                    <Box
-                                      sx={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: 1,
-                                        flexWrap: "wrap",
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="body2"
-                                        sx={{ fontWeight: esMasReciente ? 600 : 500 }}
-                                      >
-                                        {a.mensaje}
-                                      </Typography>
-
-                                      {esMasReciente && (
-                                        <Box
-                                          component="span"
-                                          sx={{
-                                            fontSize: 11,
-                                            px: 1,
-                                            py: 0.2,
-                                            borderRadius: 999,
-                                            bgcolor: "primary.soft",
-                                            color: "primary.main",
-                                            border: "1px solid",
-                                            borderColor: "primary.light",
-                                          }}
-                                        >
-                                          Nuevo
-                                        </Box>
-                                      )}
-                                    </Box>
-                                  }
-                                  secondary={
-                                    <Box
-                                      component="span"
-                                      sx={{
-                                        mt: 0.5,
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "space-between",
-                                        gap: 1,
-                                      }}
-                                    >
-                                      <Typography
-                                        component="span"
-                                        variant="caption"
-                                        color="text.secondary"
-                                        sx={{ display: "block" }}
-                                      >
-                                        {fechaFormato}
-                                      </Typography>
-
-                                      <Button
-                                        size="small"
-                                        variant="text"
-                                        onClick={() => handleMarcarLeida(a.id)}
-                                      >
-                                        Marcar como leída
-                                      </Button>
-                                    </Box>
-                                  }
-
+                          return (
+                            <ListItem
+                              key={a.id}
+                              alignItems="flex-start"
+                              sx={{
+                                mb: 1,
+                                px: 1.5,
+                                py: 1.1,
+                                borderRadius: 1.5,
+                                bgcolor: esMasReciente ? "action.hover" : "transparent",
+                                "&:hover": {
+                                  bgcolor: "action.hover",
+                                },
+                                transition: "background-color 0.2s ease",
+                              }}
+                            >
+                              <ListItemIcon sx={{ minWidth: 32, mt: 0.2 }}>
+                                <NotificationsActiveOutlinedIcon
+                                  fontSize="small"
+                                  sx={{ color: "text.secondary" }}
                                 />
-                              </ListItem>
-                            );
-                          })}
-                        </List>
-                      )}
+                              </ListItemIcon>
+                              <ListItemText
+                                primary={
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 1,
+                                      flexWrap: "wrap",
+                                    }}
+                                  >
+                                    <Typography
+                                      variant="body2"
+                                      sx={{ fontWeight: esMasReciente ? 600 : 500 }}
+                                    >
+                                      {a.mensaje}
+                                    </Typography>
 
+                                    {esMasReciente && (
+                                      <Box
+                                        component="span"
+                                        sx={{
+                                          fontSize: 11,
+                                          px: 1,
+                                          py: 0.2,
+                                          borderRadius: 999,
+                                          bgcolor: "primary.soft",
+                                          color: "primary.main",
+                                          border: "1px solid",
+                                          borderColor: "primary.light",
+                                        }}
+                                      >
+                                        Nuevo
+                                      </Box>
+                                    )}
+                                  </Box>
+                                }
+                                secondary={
+                                  <Box
+                                    component="span"
+                                    sx={{
+                                      mt: 0.5,
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "space-between",
+                                      gap: 1,
+                                    }}
+                                  >
+                                    <Typography
+                                      component="span"
+                                      variant="caption"
+                                      color="text.secondary"
+                                      sx={{ display: "block" }}
+                                    >
+                                      {fechaFormato}
+                                    </Typography>
+
+                                    <Button
+                                      size="small"
+                                      variant="text"
+                                      onClick={() => handleMarcarLeida(a.id)}
+                                    >
+                                      Marcar como leída
+                                    </Button>
+                                  </Box>
+                                }
+                              />
+                            </ListItem>
+                          );
+                        })}
+                      </List>
+                    )}
                   </Paper>
                 </Grid>
 
+                {/* ✅ AGREGADO: apartado visual de alertas de stock bajo */}
+                <Grid item xs={12} md={5}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2.5,
+                      borderRadius: 2,
+                      border: 1,
+                      borderColor: "warning.light",
+                      bgcolor: "background.paper",
+                      height: "100%",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        mb: 1.5,
+                        gap: 1,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <WarningAmberOutlinedIcon color="warning" fontSize="small" />
+                        <Typography variant="subtitle1" fontWeight={600}>
+                          Alertas de stock bajo
+                        </Typography>
+                      </Box>
+
+                      <Chip
+                        size="small"
+                        color="warning"
+                        variant="outlined"
+                        label={`${alertasStockBajoMock.length} modelo(s)`}
+                      />
+                    </Box>
+
+                    <Divider sx={{ mb: 1.5 }} />
+
+                    <Stack spacing={1.2}>
+                      {alertasStockBajoMock.map((item) => (
+                        <Box
+                          key={item.id}
+                          sx={{
+                            p: 1.4,
+                            borderRadius: 1.8,
+                            border: "1px solid",
+                            borderColor: "warning.light",
+                            bgcolor: "warning.50",
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "flex-start",
+                              gap: 1,
+                              mb: 0.8,
+                            }}
+                          >
+                            <Inventory2OutlinedIcon
+                              fontSize="small"
+                              sx={{ mt: "2px", color: "warning.main" }}
+                            />
+                            <Box sx={{ flex: 1 }}>
+                              <Typography variant="body2" fontWeight={700}>
+                                {item.modelo}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {item.sucursal}
+                              </Typography>
+                            </Box>
+                          </Box>
+
+                          <Box
+                            sx={{
+                              display: "flex",
+                              gap: 1,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <Chip
+                              size="small"
+                              label={`Stock actual: ${item.stockActual}`}
+                              color="warning"
+                            />
+                            <Chip
+                              size="small"
+                              label={`Mínimo: ${item.stockMinimo}`}
+                              variant="outlined"
+                            />
+                          </Box>
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Paper>
+                </Grid>
+
+                {/* ✅ AGREGADO: panel visual de configuración de alertas */}
+                <Grid item xs={12}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2.5,
+                      borderRadius: 2,
+                      border: 1,
+                      borderColor: "divider",
+                      bgcolor: "background.paper",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        mb: 1.5,
+                      }}
+                    >
+                      <TuneOutlinedIcon fontSize="small" />
+                      <Typography variant="subtitle1" fontWeight={600}>
+                        Configuración visual de alertas
+                      </Typography>
+                    </Box>
+
+                    <Divider sx={{ mb: 2 }} />
+
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={4}>
+                        <FormControlLabel
+                          control={<Switch defaultChecked color="warning" />}
+                          label="Activar alertas de stock bajo"
+                        />
+                      </Grid>
+
+                      <Grid item xs={12} md={4}>
+                        <FormControlLabel
+                          control={<Switch defaultChecked />}
+                          label="Activar alertas de importación"
+                        />
+                      </Grid>
+
+                     
+
+                      
+                      <Grid item xs={12} md={4}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="Correo de notificación"
+                          defaultValue="admin@comercialpoma.com"
+                        />
+                      </Grid>
+
+                      <Grid item xs={12}>
+                        <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 0.5 }}>
+                          <Button variant="contained" disabled>
+                            Guardar configuración
+                          </Button>
+                        </Box>
+                      </Grid>
+                    </Grid>
+                  </Paper>
+                </Grid>
               </Grid>
             </Box>
           }
