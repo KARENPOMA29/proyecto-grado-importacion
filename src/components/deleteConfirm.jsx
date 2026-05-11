@@ -76,19 +76,23 @@ const DeleteConfirm = ({
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 2,
-          minHeight: 200
-        }
+          borderRadius: 4,
+          overflow: "hidden",
+          boxShadow: "0 16px 40px rgba(0,0,0,0.22)",
+        },
       }}
     >
-      <DialogTitle sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        borderBottom: status === 'loading' ? 'none' : '1px solid',
-        borderColor: 'divider',
-        pb: status === 'loading' ? 0 : 2
-      }}>
+      <DialogTitle
+        sx={{
+          px: 3,
+          py: 2.3,
+          background: "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
         <Typography variant="h6" component="span" fontWeight={600}>
           {status === 'success' ? 'Éxito' : 
            status === 'error' ? 'Error' : 
@@ -96,6 +100,7 @@ const DeleteConfirm = ({
         </Typography>
         {status !== 'loading' && (
           <IconButton 
+            sx={{ color: "#fff" }}
             onClick={handleClose}
             size="small"
             disabled={status === 'loading'}
@@ -195,18 +200,34 @@ const DeleteConfirm = ({
         {/* Estado: Confirmación - Botones Eliminar/Cancelar */}
         {!status && (
           <>
-            <Button 
+            <Button
               onClick={handleClose}
               variant="outlined"
-              sx={{ minWidth: 100 }}
+              sx={{
+                minWidth: 120,
+                borderRadius: 999,
+                textTransform: "none",
+                borderColor: "#592B2B",
+                color: "#592B2B",
+                fontWeight: 600,
+              }}
             >
               {cancelText}
             </Button>
-            <Button 
+           <Button
               onClick={handleConfirm}
               variant="contained"
-              color="error"
-              sx={{ minWidth: 100 }}
+              sx={{
+                minWidth: 120,
+                borderRadius: 999,
+                textTransform: "none",
+                fontWeight: 700,
+                background: "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
+                boxShadow: "0 5px 14px rgba(89,43,43,0.35)",
+                "&:hover": {
+                  background: "linear-gradient(135deg, #3A1A1A 0%, #592B2B 100%)",
+                },
+              }}
               autoFocus
             >
               {confirmText}

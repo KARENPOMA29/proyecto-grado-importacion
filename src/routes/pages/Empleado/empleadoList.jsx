@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { PencilLine, Trash, Eye } from "lucide-react";
+import { Box, Typography, Button, Avatar } from "@mui/material";
 import GridGenerico from "@/components/Grid";
 import DetailsDialog from "@/components/details";
 import DeleteConfirm from "@/components/deleteConfirm";
@@ -9,15 +10,20 @@ import { toast } from "react-toastify";
 import ServiceEmpleado from "@/services/ServiceEmpleado";
 import ServiceSucursal from "@/services/ServiceSucursal";
 
-const IconBtn = ({ title, className = "", children, ...props }) => (
-  <button
-    title={title}
-    className={`inline-flex items-center justify-center h-9 w-9 rounded-lg transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#592B2B]/30 ${className}`}
-    {...props}
-  >
-    {children}
-  </button>
-);
+const getImageSrc = (url) => {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+
+  const base =
+    import.meta.env.VITE_FILES_URL ||
+    import.meta.env.VITE_API_URL ||
+    "";
+
+  const baseClean = base.endsWith("/") ? base.slice(0, -1) : base;
+  const pathClean = url.startsWith("/") ? url : `/${url}`;
+
+  return `${baseClean}${pathClean}`;
+};
 
 const EmpleadoList = () => {
   const [selectedId, setSelectedId] = useState(null);
@@ -30,45 +36,60 @@ const EmpleadoList = () => {
   const { user } = useAuth();
   const isAdmin = user?.rol === "Administrador";
 
-  // 🔄 Cargar sucursales para mostrar el nombre
   useEffect(() => {
     const fetchSucursales = async () => {
       try {
         const res = await ServiceSucursal.getAll();
-        const items = Array.isArray(res) ? res : res.items || [];
-        setSucursales(items);
-      } catch (err) {
-        console.error("Error cargando sucursales:", err);
+        setSucursales(Array.isArray(res) ? res : res.items || []);
+      } catch {
         toast.error("Error al cargar sucursales");
       }
     };
+
     fetchSucursales();
   }, []);
 
   const getSucursalNombre = (idSucursal) => {
-    if (!idSucursal) return "—";
-    const idNum = Number(idSucursal);
-    const suc = sucursales.find((s) => s.id === idNum);
-    // 👇 ajusta "nombre" si tu modelo de sucursal tiene otra propiedad (ej: razonSocial)
+    const suc = sucursales.find((s) => s.id === Number(idSucursal));
     return suc?.nombre || "—";
   };
 
   const columns = [
-    { name: "Nombre", selector: (r) => r.nombre, sortable: true, minWidth: "140px" },
-    { name: "Apellido", selector: (r) => r.apellido, sortable: true, minWidth: "140px" },
-    { name: "CI", selector: (r) => r.ci, sortable: true, minWidth: "110px" },
-    { name: "Rol", selector: (r) => r.rol, sortable: true, minWidth: "140px" },
     {
-      name: "Nombre",
+      name: "Foto",
+      width: "90px",
+      cell: (r) => (
+        <Avatar
+          src={getImageSrc(r.urlImagen)}
+          alt={r.nombre}
+          sx={{
+            width: 46,
+            height: 46,
+            border: "2px solid #F1E5E5",
+            bgcolor: "#592B2B",
+            fontWeight: 700,
+          }}
+        >
+          {r.nombre?.charAt(0)}
+        </Avatar>
+      ),
+    },
+    { name: "Nombre", selector: (r) => r.nombre, sortable: true, width: "160px" },
+    { name: "Apellido", selector: (r) => r.apellido, sortable: true, width: "160px" },
+    { name: "CI", selector: (r) => r.ci, sortable: true, width: "130px" },
+    { name: "Rol", selector: (r) => r.rol, sortable: true, width: "150px" },
+    {
+      name: "Sucursal",
       selector: (r) => getSucursalNombre(r.idSucursal),
       sortable: true,
-      minWidth: "160px",
+      width: "180px",
     },
-    { name: "Teléfono", selector: (r) => r.telefono, sortable: true, minWidth: "140px" },
-    { name: "Correo", selector: (r) => r.correo, sortable: true, minWidth: "220px", grow: 2 },
+    { name: "Teléfono", selector: (r) => r.telefono, sortable: true, width: "150px" },
+    { name: "Correo", selector: (r) => r.correo, sortable: true, width: "280px" },
   ];
 
   const fields = [
+    { label: "Imagen", key: "urlImagen" },
     { label: "Nombre", key: "nombre" },
     { label: "Apellido", key: "apellido" },
     { label: "Segundo Apellido", key: "segundoApellido" },
@@ -96,7 +117,6 @@ const EmpleadoList = () => {
       gridRef.current?.refetch();
       return Promise.resolve();
     } catch (error) {
-      console.error("Error eliminando empleado:", error);
       throw error;
     }
   };
@@ -111,77 +131,105 @@ const EmpleadoList = () => {
     }
   };
 
+  const actions = [
+    {
+      show: true,
+      icon: <Eye size={16} />,
+      title: "Ver detalles",
+      className:
+        "p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors duration-200",
+      onClick: (row) => setSelectedId(row.id),
+    },
+    {
+      show: isAdmin,
+      icon: <PencilLine size={16} />,
+      title: "Editar",
+      className:
+        "p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors duration-200",
+      onClick: (row) => handleEdit(row.id),
+    },
+    {
+      show: isAdmin,
+      icon: <Trash size={16} />,
+      title: "Eliminar",
+      className:
+        "p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duration-200",
+      onClick: (row) => setIdToDelete(row.id),
+    },
+  ];
+
   return (
-    <div className="flex flex-col gap-6 p-4 sm:p-6 min-h-screen bg-[#F5F5F5]">
-      {/* HEADER */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-start gap-3 flex-1">
-            <div>
-              <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">
-                Gestión de Empleados
-              </h1>
-              <p className="text-gray-600 text-sm mt-1"></p>
-            </div>
+    <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
+      <Box
+        sx={{
+          mb: 4,
+          display: "flex",
+          flexDirection: { xs: "column", md: "row" },
+          alignItems: { xs: "flex-start", md: "center" },
+          justifyContent: "space-between",
+          gap: 2,
+        }}
+      >
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 700, color: "#3A1A1A", mb: 1 }}>
+            Gestión de Empleados
+          </Typography>
+
+          <Typography variant="body1" sx={{ color: "text.secondary", fontSize: "1rem" }}>
+            Administra empleados registrados y consulta su información.
+          </Typography>
+        </Box>
+
+        {isAdmin && (
+          <Button
+            variant="contained"
+            onClick={() => {
+              setFormData(null);
+              setShowForm(true);
+            }}
+            startIcon={<PencilLine size={18} />}
+            sx={{
+              borderRadius: 999,
+              px: 3.5,
+              py: 1.3,
+              fontWeight: 700,
+              textTransform: "none",
+              fontSize: "15px",
+              background: "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+              "&:hover": {
+                background: "linear-gradient(135deg, #3A1A1A 0%, #592B2B 100%)",
+              },
+            }}
+          >
+            Nuevo Empleado
+          </Button>
+        )}
+      </Box>
+
+      <GridGenerico
+        ref={gridRef}
+        service={ServiceEmpleado}
+        columns={columns}
+        title="Listado de Empleados"
+        pageSize={10}
+        renderActions={(row) => (
+          <div className="flex items-center justify-center gap-2 whitespace-nowrap">
+            {actions
+              .filter((a) => a.show)
+              .map((a) => (
+                <button
+                  key={a.title}
+                  className={a.className}
+                  onClick={() => a.onClick(row)}
+                  title={a.title}
+                >
+                  {a.icon}
+                </button>
+              ))}
           </div>
-          {isAdmin && (
-            <button
-              onClick={() => {
-                setFormData(null);
-                setShowForm(true);
-              }}
-              className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-semibold 
-                         hover:bg-emerald-700 shadow-md hover:shadow-lg transition-all duration-200"
-            >
-              Nuevo Empleado
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* GRID */}
-      <div className="mt-2 bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-        <GridGenerico
-          ref={gridRef}
-          service={ServiceEmpleado}
-          columns={columns}
-          title="Listado de Empleados"
-          defaultSortField="nombre"
-          defaultSortAsc={true}
-          pageSize={10}
-          renderActions={(row) => (
-            <div className="flex flex-nowrap gap-2 whitespace-nowrap">
-              <IconBtn
-                title="Ver detalles"
-                className="bg-[#2B5959] text-white hover:bg-[#3B6a6a]"
-                onClick={() => setSelectedId(row.id)}
-              >
-                <Eye size={16} />
-              </IconBtn>
-
-              {isAdmin && (
-                <>
-                  <IconBtn
-                    title="Editar"
-                    className="bg-[#592B2B] text-white hover:bg-[#733a3a]"
-                    onClick={() => handleEdit(row.id)}
-                  >
-                    <PencilLine size={16} />
-                  </IconBtn>
-
-                  <IconBtn
-                    title="Eliminar"
-                    className="bg-[#8a2b2b] text-white hover:bg-[#a23a3a]"
-                    onClick={() => setIdToDelete(row.id)}
-                  >
-                    <Trash size={16} />
-                  </IconBtn>
-                </>
-              )}
-            </div>
-          )}
-        />
-      </div>
+        )}
+      />
 
       <DetailsDialog
         open={!!selectedId}
@@ -194,7 +242,7 @@ const EmpleadoList = () => {
       {idToDelete && (
         <DeleteConfirm
           title="¿Eliminar empleado?"
-          message="Esta acción eliminará el empleado permanentemente y no se podrá deshacer."
+          message="Esta acción eliminará el empleado lógicamente y no se podrá deshacer."
           onConfirm={handleDelete}
           onCancel={() => setIdToDelete(null)}
         />
@@ -210,7 +258,7 @@ const EmpleadoList = () => {
           }}
         />
       )}
-    </div>
+    </Box>
   );
 };
 

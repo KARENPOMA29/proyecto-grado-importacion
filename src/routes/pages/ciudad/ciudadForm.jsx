@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import { toast } from "react-toastify";
 import {
   Dialog,
   DialogTitle,
@@ -9,33 +10,57 @@ import {
   Box,
   Typography,
   Alert,
+  Grid,
 } from "@mui/material";
-import { toast } from "react-toastify";
 import ServiceCiudad from "@/services/ServiceCiudad";
 
 const CiudadForm = ({ onClose, onSuccess, initialData = null }) => {
-  const [nombre, setNombre] = useState("");
-  const [touched, setTouched] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+  const [form, setForm] = useState({
+    nombre: "",
+  });
+
+  const [touched, setTouched] = useState({
+    nombre: false,
+  });
+
+  const [formError, setFormError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Cargar datos si es edición
+  const regexNombre = /^[A-Za-zÁÉÍÓÚáéíóúÑñ .-]+$/;
+
   useEffect(() => {
-    setNombre(initialData?.nombre || "");
-    setTouched(false);
-    setErrorMsg("");
+    setForm({
+      nombre: initialData?.nombre || "",
+    });
+    setTouched({ nombre: false });
+    setFormError("");
   }, [initialData]);
 
-  const validate = () => {
-    const value = nombre.trim();
+  const handleChange = (field, value) => {
+    let newVal = value;
 
-    if (!value) {
-      setErrorMsg("El nombre de la ciudad es obligatorio");
+    if (field === "nombre") {
+      newVal = newVal.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ .-]/g, "");
+    }
+
+    setForm((prev) => ({ ...prev, [field]: newVal }));
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    setFormError("");
+  };
+
+  const validateForm = () => {
+    if (!form.nombre?.trim()) {
+      setFormError("Por favor complete el nombre de la ciudad.");
       return false;
     }
 
-    if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ .-]+$/.test(value)) {
-      setErrorMsg("El nombre contiene caracteres no permitidos");
+    if (form.nombre.trim().length < 3) {
+      setFormError("El nombre de la ciudad debe tener al menos 3 caracteres.");
+      return false;
+    }
+
+    if (!regexNombre.test(form.nombre.trim())) {
+      setFormError("El nombre contiene caracteres no permitidos.");
       return false;
     }
 
@@ -44,14 +69,19 @@ const CiudadForm = ({ onClose, onSuccess, initialData = null }) => {
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
-    setTouched(true);
-    setErrorMsg("");
 
-    if (!validate()) return;
+    setFormError("");
+    setTouched({ nombre: true });
+
+    if (!validateForm()) return;
 
     setLoading(true);
+
     try {
-      const payload = { nombre: nombre.trim() };
+      const payload = {
+        nombre: form.nombre.trim(),
+      };
+
       let result;
 
       if (initialData?.id) {
@@ -62,79 +92,145 @@ const CiudadForm = ({ onClose, onSuccess, initialData = null }) => {
         toast.success("Ciudad creada correctamente");
       }
 
-      // avisar al padre (puede usar o ignorar result)
       onSuccess?.(result);
       onClose?.();
     } catch (err) {
       console.error("Error en CiudadForm:", err);
+
       const msg =
         err.response?.data?.detail ||
         err.message ||
         "Error al guardar ciudad";
-      setErrorMsg(msg);
+
+      setFormError(msg);
       toast.error(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = (value) => {
-    const v = value.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ .-]/g, "");
-    setNombre(v);
-    setTouched(true);
-  };
-
   return (
     <Dialog
-      open={true}
+      open
       onClose={onClose}
-      maxWidth="xs"
+      maxWidth="sm"
       fullWidth
-      PaperProps={{ sx: { borderRadius: 2 } }}
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          overflow: "hidden",
+          boxShadow: "0 12px 36px rgba(0,0,0,0.18)",
+        },
+      }}
     >
       <DialogTitle
-        sx={{ borderBottom: "1px solid", borderColor: "divider", pb: 2 }}
+        sx={{
+          p: 2.5,
+          pb: 2,
+          background: "linear-gradient(135deg, #af7676 0%, #896666 100%)",
+          color: "#F5F5F5",
+        }}
       >
-        <Typography variant="h6" fontWeight={600}>
+        <Typography component="div" variant="h6" fontWeight={700}>
           {initialData ? "Editar Ciudad" : "Nueva Ciudad"}
+        </Typography>
+
+        <Typography
+          component="div"
+          variant="body2"
+          sx={{ opacity: 0.9, mt: 0.5 }}
+        >
+          Complete la información de la ciudad.
         </Typography>
       </DialogTitle>
 
-      <DialogContent sx={{ py: 3 }}>
-        <Box component="form" onSubmit={handleSubmit} noValidate>
-          <TextField
-            fullWidth
-            label="Nombre de la ciudad"
-            value={nombre}
-            onChange={(e) => handleChange(e.target.value)}
-            disabled={loading}
-            error={touched && !!errorMsg}
-            helperText={
-              touched && errorMsg
-                ? errorMsg
-                : "Ej: Cochabamba, La Paz, Santa Cruz..."
-            }
-          />
+      <DialogContent sx={{ py: 3, px: 3, bgcolor: "#FAFAFA" }}>
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
+          noValidate
+          sx={{
+            bgcolor: "#FFFFFF",
+            borderRadius: 2,
+            p: 2.5,
+            boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+          }}
+        >
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Nombre de la ciudad"
+                placeholder="Ej: Cochabamba"
+                value={form.nombre}
+                onChange={(e) => handleChange("nombre", e.target.value)}
+                error={
+                  touched.nombre &&
+                  (!form.nombre?.trim() ||
+                    !regexNombre.test(form.nombre.trim()))
+                }
+                helperText={
+                  touched.nombre && !form.nombre?.trim()
+                    ? "Campo requerido"
+                    : touched.nombre &&
+                      !regexNombre.test(form.nombre.trim())
+                    ? "No se permiten caracteres especiales"
+                    : "Obligatorio"
+                }
+                required
+                disabled={loading}
+              />
+            </Grid>
+          </Grid>
 
-          {errorMsg && (
+          {formError && (
             <Alert severity="error" sx={{ mt: 3 }}>
-              {errorMsg}
+              {formError}
             </Alert>
           )}
         </Box>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
-        <Button onClick={onClose} variant="outlined" disabled={loading}>
-          CANCELAR
+      <DialogActions sx={{ px: 3, py: 2.5, gap: 1.5 }}>
+        <Button
+          onClick={onClose}
+          variant="outlined"
+          disabled={loading}
+          sx={{
+            textTransform: "none",
+            borderRadius: 999,
+            px: 3,
+            borderColor: "#e0e0e0",
+            color: "rgba(0,0,0,0.7)",
+            "&:hover": {
+              borderColor: "#d32f2f",
+              color: "#d32f2f",
+              backgroundColor: "rgba(211,47,47,0.04)",
+            },
+          }}
+        >
+          Cancelar
         </Button>
+
         <Button
           onClick={handleSubmit}
           variant="contained"
           disabled={loading}
-          sx={{ minWidth: 100 }}
+          sx={{
+            textTransform: "none",
+            borderRadius: 999,
+            px: 4,
+            minWidth: 140,
+            fontWeight: 600,
+            background: "linear-gradient(135deg, #14AE5C 0%, #0D8C47 100%)",
+            "&:hover": {
+              background: "linear-gradient(135deg, #0D8C47 0%, #0A6B37 100%)",
+              boxShadow: "0 4px 12px rgba(20,174,92,0.4)",
+            },
+          }}
         >
-          {loading ? "Guardando..." : "GUARDAR"}
+          {loading ? "Guardando..." : "Guardar"}
         </Button>
       </DialogActions>
     </Dialog>

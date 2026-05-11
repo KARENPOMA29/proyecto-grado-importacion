@@ -16,6 +16,7 @@ const getAll = async (params = {}) => {
   }
 };
 
+
 const getById = async (id) => {
   try {
     const res = await api.get(`${BASE}/${id}`);
@@ -26,7 +27,12 @@ const getById = async (id) => {
     throw new Error(message);
   }
 };
-
+const getByAlmacen = async (almacenId, params = {}) => {
+  return getAll({
+    ...params,
+    almacenId,
+  });
+};
 const create = async (payload) => {
   try {
     const res = await api.post(`${BASE}/`, payload);
@@ -60,5 +66,5 @@ const remove = async (id) => {
   }
 };
 
-const ServiceSeccion = { getAll, getById, create, update, remove };
+const ServiceSeccion = { getAll, getById, getByAlmacen, create, update, remove };
 export default ServiceSeccion;

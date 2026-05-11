@@ -83,9 +83,21 @@ const uploadImagen = async (file) => {
 const getAll = async (params = {}) => {
   try {
     const res = await api.get(`${BASE}/`, { params });
-    const data = Array.isArray(res.data) ? res.data : res.data?.items ?? [];
-    const normalized = data.map((m) => normalizeModelo(m));
-    return { items: normalized, total: normalized.length };
+
+    const items = Array.isArray(res.data)
+      ? res.data
+      : res.data?.items ?? [];
+
+    const total = Array.isArray(res.data)
+      ? items.length
+      : res.data?.total ?? items.length;
+
+    const normalized = items.map((m) => normalizeModelo(m));
+
+    return {
+      items: normalized,
+      total,
+    };
   } catch (err) {
     const detail =
       err.response?.data?.detail ?? err.response?.data ?? err.message;

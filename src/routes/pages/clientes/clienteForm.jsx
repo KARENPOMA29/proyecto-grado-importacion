@@ -226,11 +226,11 @@ const ClienteForm = ({ onClose, onSuccess, initialData = null }) => {
           color: "#F5F5F5",
         }}
       >
-        <Typography variant="h6" fontWeight={700}>
+        <Typography component="div" variant="h6" fontWeight={700}>
           {initialData ? "Editar Cliente" : "Nuevo Cliente"}
         </Typography>
-        <Typography variant="body2" sx={{ opacity: 0.9, mt: 0.5 }}>
-          Complete la información comercial del cliente.
+        <Typography component="div" variant="body2" sx={{ opacity: 0.9, mt: 0.5 }}>
+          Complete la información del cliente.
         </Typography>
       </DialogTitle>
 
@@ -308,7 +308,7 @@ const ClienteForm = ({ onClose, onSuccess, initialData = null }) => {
                     : "Obligatorio",
               },
             ].map((item) => (
-              <Grid item xs={12} sm={6} key={item.field}>
+              <Grid size={{ xs: 12, sm: 6 }} key={item.field}>  
                 <TextField
                   fullWidth
                   size="small"

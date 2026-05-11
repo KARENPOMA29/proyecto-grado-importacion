@@ -358,8 +358,9 @@ const SucursalForm = ({ onClose, onSuccess, initialData = null }) => {
                 sm={4}
                 sx={{
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: { xs: "flex-end", sm: "flex-start" },
+                  alignItems: "flex-start",
+                  justifyContent: "flex-start",
+                  pt: "2px",
                 }}
               >
                 <Tooltip title="Agregar nueva ciudad">
@@ -368,16 +369,23 @@ const SucursalForm = ({ onClose, onSuccess, initialData = null }) => {
                       onClick={() => setShowCiudadForm(true)}
                       disabled={loading}
                       sx={{
+                        width: 40,
+                        height: 40,
                         borderRadius: 2,
-                        border: "1px dashed #D6C6C6",
-                        bgcolor: "#F5F5F5",
+                        border: "1px solid #C9B3B3",
+                        bgcolor: "#FFFFFF",
+                        mt: "1px",
+
                         "&:hover": {
-                          bgcolor: "#EEE0E0",
+                          bgcolor: "#F8F1F1",
                           borderColor: "#592B2B",
+                          transform: "scale(1.03)",
                         },
+
+                        transition: "all 0.2s ease",
                       }}
                     >
-                      <Plus size={20} color="#592B2B" />
+                      <Plus size={18} color="#592B2B" />
                     </IconButton>
                   </span>
                 </Tooltip>

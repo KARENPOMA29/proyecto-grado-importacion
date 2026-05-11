@@ -366,31 +366,22 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
       fullWidth
       PaperProps={{ className: "dialog-paper" }}
     >
-      <DialogTitle className="dialog-title">
-        <Box className="title-content">
-          <Typography variant="h5" fontWeight={700} gutterBottom>
-            {isEdit ? "Editar Empleado" : "Nuevo Empleado"}
-          </Typography>
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              flexWrap: "wrap",
-            }}
-          >
-            <Chip
-              label={isEdit ? "Modo Edición" : "Modo Creación"}
-              color={isEdit ? "warning" : "success"}
-              variant="filled"
-              className="mode-chip"
-            />
-            <Typography variant="body2" sx={{ opacity: 0.9 }}>
-              Complete todos los campos obligatorios
-            </Typography>
-          </Box>
-        </Box>
-      </DialogTitle>
+  <DialogTitle
+    sx={{
+      p: 2.5,
+      pb: 2,
+      background: "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
+      color: "#F5F5F5",
+    }}
+  >
+    <Typography component="div" variant="h6" fontWeight={700}>
+      {isEdit ? "Editar Empleado" : "Nuevo Empleado"}
+    </Typography>
+
+    <Typography component="div" variant="body2" sx={{ opacity: 0.9, mt: 0.5 }}>
+      Complete la información del empleado.
+    </Typography>
+  </DialogTitle>
 
       <DialogContent dividers className="dialog-content">
         <Box className="form-container">
@@ -760,62 +751,78 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
             {/* Info adicional / imagen */}
             <Card className="section-card">
               <CardContent sx={{ p: 3 }}>
-                <Typography
-                  variant="h6"
-                  fontWeight={600}
-                  gutterBottom
-                  className="section-title"
-                >
-                  Información Adicional
+                <Typography variant="h6" fontWeight={600} gutterBottom className="section-title">
+                  Foto del Empleado
                 </Typography>
-                <Grid container spacing={3} className="form-grid">
-                  {/* Botón para subir imagen */}
-                  <Grid item xs={12} md={6}>
+
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: { xs: "column", sm: "row" },
+                    alignItems: "center",
+                    gap: 3,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 150,
+                      height: 150,
+                      borderRadius: "50%",
+                      overflow: "hidden",
+                      border: "4px solid #F1E5E5",
+                      boxShadow: "0 8px 22px rgba(0,0,0,0.16)",
+                      bgcolor: "#F8F2F2",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {form.urlImagen ? (
+                      <Box
+                        component="img"
+                        src={getImageSrc(form.urlImagen)}
+                        alt="Foto del empleado"
+                        sx={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
+                    ) : (
+                      <Typography sx={{ color: "#592B2B", fontWeight: 700 }}>
+                        Sin foto
+                      </Typography>
+                    )}
+                  </Box>
+
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
+                      Suba una imagen del empleado para mostrarla en el listado y en los detalles.
+                    </Typography>
+
                     <Button
                       variant="outlined"
                       component="label"
                       disabled={loading || subiendoImagen}
-                      className="upload-button"
+                      sx={{
+                        borderRadius: 999,
+                        px: 3,
+                        textTransform: "none",
+                        fontWeight: 600,
+                        borderColor: "#592B2B",
+                        color: "#592B2B",
+                        "&:hover": {
+                          borderColor: "#3A1A1A",
+                          bgcolor: "#F8F2F2",
+                        },
+                      }}
                     >
-                      {subiendoImagen
-                        ? "Subiendo imagen..."
-                        : "Subir foto de perfil"}
-                      <input
-                        type="file"
-                        hidden
-                        accept="image/*"
-                        onChange={handleImagenChange}
-                      />
+                      {subiendoImagen ? "Subiendo imagen..." : "Subir foto de perfil"}
+                      <input type="file" hidden accept="image/*" onChange={handleImagenChange} />
                     </Button>
-                  </Grid>
-
-                  {/* Vista previa de la imagen */}
-                  {form.urlImagen && (
-                    <Grid item xs={12} md={6}>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "flex-start",
-                          gap: 1,
-                        }}
-                      >
-                        <Typography variant="body2">Vista previa:</Typography>
-                        <img
-                          src={getImageSrc(form.urlImagen)}
-                          alt="Foto del empleado"
-                          style={{
-                            maxWidth: "140px",
-                            maxHeight: "140px",
-                            borderRadius: "50%",
-                            objectFit: "cover",
-                            
-                          }}
-                        />
-                      </Box>
-                    </Grid>
-                  )}
-                </Grid>
+                  </Box>
+                </Box>
               </CardContent>
             </Card>
 
@@ -844,21 +851,52 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
         </Box>
       </DialogContent>
 
-      <DialogActions className="dialog-actions">
+      <DialogActions
+        sx={{
+          px: 3,
+          py: 2.5,
+          gap: 1.5,
+          bgcolor: "#FAFAFA",
+          borderTop: "1px solid #E0E0E0",
+        }}
+      >
         <Button
           onClick={onClose}
           variant="outlined"
           disabled={loading}
-          className="cancel-button"
+          sx={{
+            textTransform: "none",
+            borderRadius: 999,
+            px: 3,
+            borderColor: "#e0e0e0",
+            color: "rgba(0,0,0,0.7)",
+            "&:hover": {
+              borderColor: "#d32f2f",
+              color: "#d32f2f",
+              backgroundColor: "rgba(211,47,47,0.04)",
+            },
+          }}
         >
           Cancelar
         </Button>
+
         <Button
           type="submit"
           form={FORM_ID}
           variant="contained"
           disabled={loading || checkingCi || ciExists || subiendoImagen}
-          className="submit-button"
+          sx={{
+            textTransform: "none",
+            borderRadius: 999,
+            px: 4,
+            minWidth: 140,
+            fontWeight: 600,
+            background: "linear-gradient(135deg, #14AE5C 0%, #0D8C47 100%)",
+            "&:hover": {
+              background: "linear-gradient(135deg, #0D8C47 0%, #0A6B37 100%)",
+              boxShadow: "0 4px 12px rgba(20,174,92,0.4)",
+            },
+          }}
         >
           {loading ? "Guardando..." : "Guardar"}
         </Button>

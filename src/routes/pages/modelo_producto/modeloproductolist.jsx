@@ -7,6 +7,7 @@ import ModeloProductoForm from "./ModeloProductoForm";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "react-toastify";
 import ServiceModeloProducto from "@/services/ServiceModeloProducto";
+import { Box, Typography, Button } from "@mui/material";
 
 const getTipoGarantiaLabel = (code) => {
   if (!code) return "—";
@@ -83,18 +84,7 @@ const ModeloProductoList = () => {
       sortable: true,
       minWidth: "100px",
     },
-    {
-      name: "Stock Actual",
-      selector: (r) => r.stockActual,
-      sortable: true,
-      minWidth: "120px",
-    },
-    {
-      name: "Stock Mínimo",
-      selector: (r) => r.stockMinimo,
-      sortable: true,
-      minWidth: "120px",
-    },
+    
     {
       name: "Garantía",
       selector: (r) =>
@@ -160,10 +150,16 @@ const ModeloProductoList = () => {
       await ServiceModeloProducto.remove(idToDelete);
       toast.success("Modelo eliminado correctamente");
       gridRef.current?.refetch();
-    } catch (error) {
-      toast.error(error.message);
-    } finally {
       setIdToDelete(null);
+    } catch (error) {
+      const msg =
+        error?.response?.data?.detail ||
+        error?.message ||
+        "No se pudo eliminar el modelo.";
+
+      toast.error(msg);
+
+      throw error;
     }
   };
 
@@ -178,25 +174,67 @@ const ModeloProductoList = () => {
   };
 
   return (
-    <div className="flex flex-col gap-y-6 p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-          Gestión de Modelos de Producto
-        </h1>
+    <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
+      <Box
+        sx={{
+          mb: 4,
+          display: "flex",
+          flexDirection: { xs: "column", md: "row" },
+          alignItems: { xs: "flex-start", md: "center" },
+          justifyContent: "space-between",
+          gap: 2,
+        }}
+      >
+        <Box>
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 700,
+              color: "#3A1A1A",
+              mb: 1,
+            }}
+          >
+            Gestión de Modelos de Producto
+          </Typography>
+
+          <Typography
+            variant="body1"
+            sx={{
+              color: "text.secondary",
+              fontSize: "1rem",
+            }}
+          >
+            Administra modelos de productos registrados y consulta su información.
+          </Typography>
+        </Box>
 
         {canCreate && (
-          <button
+          <Button
+            variant="contained"
             onClick={() => {
               setFormData(null);
               setShowForm(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 font-medium"
+            startIcon={<PencilLine size={18} />}
+            sx={{
+              borderRadius: 999,
+              px: 3.5,
+              py: 1.3,
+              fontWeight: 700,
+              textTransform: "none",
+              fontSize: "15px",
+              background: "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+              "&:hover": {
+                background: "linear-gradient(135deg, #3A1A1A 0%, #592B2B 100%)",
+                boxShadow: "0 6px 16px rgba(0,0,0,0.35)",
+              },
+            }}
           >
-            <PencilLine size={18} />
             Nuevo Modelo
-          </button>
+          </Button>
         )}
-      </div>
+      </Box>
 
       <GridGenerico
         ref={gridRef}
@@ -249,7 +287,7 @@ const ModeloProductoList = () => {
       {idToDelete && canDelete && (
         <DeleteConfirm
           title="¿Eliminar modelo?"
-          message="Esta acción eliminará el modelo de producto (lógicamente)."
+          message="Solo se podrá eliminar si no tiene productos ni secciones vinculadas."
           onConfirm={handleDelete}
           onCancel={() => setIdToDelete(null)}
         />
@@ -265,7 +303,7 @@ const ModeloProductoList = () => {
           }}
         />
       )}
-    </div>
+    </Box>
   );
 };
 

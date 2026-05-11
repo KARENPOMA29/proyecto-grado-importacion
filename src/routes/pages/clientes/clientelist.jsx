@@ -28,34 +28,32 @@ const ClienteList = () => {
   const canDelete = roleKey === "administrador";
 
   // 🔄 AHORA columnas según nuevo schema
-  const columns = [
-    {
-      name: "Razón Social",
-      selector: (r) => r.razonSocial,
-      sortable: true,
-      minWidth: "180px",
-      grow: 2,
-    },
-    {
-      name: "NIT",
-      selector: (r) => r.nit,
-      sortable: true,
-      minWidth: "120px",
-    },
-    {
-      name: "Correo",
-      selector: (r) => r.correo,
-      sortable: true,
-      minWidth: "180px",
-      grow: 2,
-    },
-    {
-      name: "Teléfono",
-      selector: (r) => r.telefono,
-      sortable: true,
-      minWidth: "110px",
-    },
-  ];
+const columns = [
+  {
+    name: "Razón Social",
+    selector: (r) => r.razonSocial,
+    sortable: true,
+    width: "280px",
+  },
+  {
+    name: "NIT",
+    selector: (r) => r.nit,
+    sortable: true,
+    width: "180px",
+  },
+  {
+    name: "Correo",
+    selector: (r) => r.correo,
+    sortable: true,
+    width: "380px",
+  },
+  {
+    name: "Teléfono",
+    selector: (r) => r.telefono,
+    sortable: true,
+    width: "190px",
+  },
+];
 
   // 🔄 Campos para el diálogo de detalles
   const fields = [

@@ -18,7 +18,19 @@ const getAll = async (params = {}) => {
     throw new Error(message);
   }
 };
+const getCombo = async () => {
+  try {
+    const res = await api.get(`${BASE}/combo`);
+    return res.data;
+  } catch (err) {
+    const message =
+      err.response?.data?.detail ||
+      err.message ||
+      "Error al obtener almacenes";
 
+    throw new Error(message);
+  }
+};
 const getById = async (id) => {
   try {
     const res = await api.get(`${BASE}/${id}`);
@@ -72,9 +84,11 @@ const remove = async (id) => {
 };
 
 // 👉 helper para filtrar por sucursal usando el mismo getAll
-const getBySucursal = async (sucursalId) => {
-  // esto termina llamando a /almacenes?sucursalId=123
-  return getAll({ sucursalId });
+const getBySucursal = async (sucursalId, params = {}) => {
+  return getAll({
+    ...params,
+    sucursalId,
+  });
 };
 
 const ServiceAlmacen = {
@@ -84,6 +98,7 @@ const ServiceAlmacen = {
   update,
   remove,
   getBySucursal,
+  getCombo
 };
 
 export default ServiceAlmacen;

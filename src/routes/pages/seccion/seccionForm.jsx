@@ -9,53 +9,98 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  FormHelperText,
   Typography,
   Button,
   Box,
   Alert,
   IconButton,
   Tooltip,
+  Divider,
 } from "@mui/material";
-import { Add } from "@mui/icons-material"; // 🆕
+import ServiceSucursal from "@/services/ServiceSucursal";
+import ServiceAlmacen from "@/services/ServiceAlmacen";
+import { Add } from "@mui/icons-material";
 import { useForm, Controller } from "react-hook-form";
 import { toast } from "react-toastify";
+
 import ServiceSeccion from "@/services/ServiceSeccion";
-import ModeloProductoForm from "@/routes/pages/modelo_producto/modeloproductoForm"; // 🆕 ajusta la ruta si hace falta
+import AlmacenForm from "@/routes/pages/almacen/almacenForm";
+import ModeloProductoForm from "@/routes/pages/modelo_producto/modeloproductoForm";
 
 export default function SeccionForm({
   open,
   onClose,
-  seccion,
+  seccion = null,
   almacenes = [],
   modelos = [],
-  // 👇 opcional: cuando abres desde un almacén específico
+  sucursales = [],
   almacenContext = null,
 }) {
   const {
     control,
     handleSubmit,
-    formState: { errors },
     reset,
     setValue,
   } = useForm({
+    mode: "onBlur",
+    reValidateMode: "onChange",
     defaultValues: {
       nombre: "",
       almacenId: "",
       modeloId: "",
       descripcion: "",
     },
-    mode: "onChange", // 👉 valida en tiempo real
   });
 
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState("");
 
-  // 🆕 modelos locales para que se pueda agregar uno nuevo sin depender del padre
+  const [almacenesLocal, setAlmacenesLocal] = useState(almacenes || []);
   const [modelosLocal, setModelosLocal] = useState(modelos || []);
 
-  // 🆕 control del modal de ModeloProductoForm
+  const [openAlmacenForm, setOpenAlmacenForm] = useState(false);
   const [openModeloForm, setOpenModeloForm] = useState(false);
+  const [sucursalesLocal, setSucursalesLocal] = useState(sucursales || []);
+
+  useEffect(() => {
+    const cargarSucursales = async () => {
+      try {
+        const resp = await ServiceSucursal.getAll();
+        const data = resp?.items || resp || [];
+        setSucursalesLocal(data);
+      } catch (error) {
+        console.error("Error cargando sucursales:", error);
+        toast.error("Error al cargar sucursales");
+      }
+    };
+
+    if (sucursales && sucursales.length > 0) {
+      setSucursalesLocal(sucursales);
+    } else {
+      cargarSucursales();
+    }
+  }, [sucursales]);
+  useEffect(() => {
+    const cargarAlmacenes = async () => {
+      try {
+        const resp = await ServiceAlmacen.getCombo();
+
+        const data =
+          resp?.items ||
+          resp?.data ||
+          resp?.almacenes ||
+          resp ||
+          [];
+
+        setAlmacenesLocal(data);
+      } catch (error) {
+        console.error("Error cargando almacenes:", error);
+        toast.error("Error al cargar almacenes");
+      }
+    };
+
+    cargarAlmacenes();
+  }, []);
 
   useEffect(() => {
     setModelosLocal(modelos || []);
@@ -63,13 +108,11 @@ export default function SeccionForm({
 
   useEffect(() => {
     if (seccion) {
-      // 🟢 Editar
       setValue("nombre", seccion.nombre ?? "");
       setValue("almacenId", seccion.almacenId ?? "");
       setValue("modeloId", seccion.modeloId ?? "");
       setValue("descripcion", seccion.descripcion ?? "");
     } else if (almacenContext) {
-      // 🟢 Crear desde un almacén específico
       reset({
         nombre: "",
         almacenId: almacenContext.id,
@@ -77,7 +120,6 @@ export default function SeccionForm({
         descripcion: "",
       });
     } else {
-      // 🟢 Crear normal
       reset({
         nombre: "",
         almacenId: "",
@@ -85,8 +127,52 @@ export default function SeccionForm({
         descripcion: "",
       });
     }
+
     setFormError("");
   }, [seccion, almacenContext, reset, setValue]);
+
+
+  const labelAlmacen = (a) => {
+    if (!a) return "";
+    return a.nombre ?? `Almacén #${a.id}`;
+  };
+
+  const labelModelo = (m) =>
+    m?.nombreModelo ??
+    m?.modeloNombre ??
+    m?.nombre ??
+    m?.descripcion ??
+    `Modelo #${m?.id}`;
+
+  const handleAlmacenCreated = (nuevoAlmacen) => {
+    if (!nuevoAlmacen) return;
+
+    setAlmacenesLocal((prev) => [...prev, nuevoAlmacen]);
+
+    if (nuevoAlmacen.id) {
+      setValue("almacenId", nuevoAlmacen.id, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    }
+
+    toast.success("Almacén creado y seleccionado correctamente");
+  };
+
+  const handleModeloCreated = (nuevoModelo) => {
+    if (!nuevoModelo) return;
+
+    setModelosLocal((prev) => [...prev, nuevoModelo]);
+
+    if (nuevoModelo.id) {
+      setValue("modeloId", nuevoModelo.id, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    }
+
+    toast.success("Modelo creado y seleccionado correctamente");
+  };
 
   const onSubmit = async (data) => {
     try {
@@ -97,7 +183,7 @@ export default function SeccionForm({
         nombre: data.nombre?.trim() || null,
         almacenId: Number(data.almacenId),
         modeloId: Number(data.modeloId),
-        descripcion: data.descripcion.trim(),
+        descripcion: data.descripcion?.trim() || "",
       };
 
       if (seccion?.id) {
@@ -114,50 +200,28 @@ export default function SeccionForm({
         modeloId: "",
         descripcion: "",
       });
-      onClose(true);
+
+      onClose?.(true);
     } catch (error) {
       console.error("Error al guardar sección:", error);
+
       const msg =
-        error.response?.data?.detail ||
-        error.message ||
+        error?.response?.data?.detail ||
+        error?.message ||
         "Error al procesar la sección";
-      setFormError(msg); // ej: duplicado de nombre en el mismo almacén
+
+      setFormError(msg);
       toast.error(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  // Helpers para nombres robustos
-  const labelAlmacen = (a) => a?.nombre ?? a?.descripcion ?? `Almacén #${a?.id}`;
-  const labelModelo = (m) =>
-    m?._nombre ??
-    m?.nombre ??
-    m?.nombreModelo ??
-    m?.modeloNombre ??
-    m?.descripcion ??
-    `Modelo #${m?.id}`;
-
-  // 🆕 cuando se crea un modelo desde el modal de modelos
-  const handleModeloCreated = (nuevoModelo) => {
-    if (!nuevoModelo) return;
-
-    // Agregar al combo local
-    setModelosLocal((prev) => [...prev, nuevoModelo]);
-
-    // Seleccionar automáticamente el nuevo modelo en el formulario
-    if (nuevoModelo.id) {
-      setValue("modeloId", nuevoModelo.id);
-    }
-
-    toast.success("Modelo creado y seleccionado correctamente");
-  };
-
   return (
     <>
       <Dialog
         open={open}
-        onClose={() => onClose(false)}
+        onClose={() => onClose?.(false)}
         maxWidth="sm"
         fullWidth
         PaperProps={{
@@ -168,13 +232,13 @@ export default function SeccionForm({
           },
         }}
       >
-        {/* HEADER estilo vino, igual que los otros forms */}
         <DialogTitle
+          component="div"
           sx={{
+            p: 2.5,
+            pb: 2,
             background: "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
             color: "#F5F5F5",
-            py: 2.5,
-            px: 3,
           }}
         >
           <Typography variant="h6" component="span" fontWeight={700}>
@@ -212,7 +276,6 @@ export default function SeccionForm({
               gap: 2,
             }}
           >
-            {/* NOMBRE (opcional, pero validado) */}
             <Controller
               name="nombre"
               control={control}
@@ -226,111 +289,90 @@ export default function SeccionForm({
                   message: "No se permiten caracteres especiales",
                 },
               }}
-              render={({ field }) => (
+              render={({ field, fieldState }) => (
                 <TextField
                   {...field}
-                  label="Nombre de la sección (opcional)"
                   fullWidth
                   size="small"
+                  label="Nombre de la sección"
                   disabled={loading}
-                  error={!!errors.nombre}
-                  helperText={errors.nombre?.message || ""}
+                  error={!!fieldState.error}
+                  helperText={fieldState.error?.message || "Opcional"}
                 />
               )}
             />
 
-            {/* ALMACÉN */}
             <Controller
               name="almacenId"
               control={control}
-              rules={{ required: "El almacén es requerido" }}
-              render={({ field }) => (
-                <FormControl
-                  fullWidth
-                  size="small"
-                  margin="dense"
-                  error={!!errors.almacenId}
-                  disabled={loading || !!almacenContext}
-                >
-                  <InputLabel id="almacen-label">Almacén</InputLabel>
-                  <Select
-                    {...field}
-                    labelId="almacen-label"
-                    label="Almacén"
-                    value={field.value ?? ""}
-                  >
-                    {!almacenContext &&
-                      almacenes.map((alm) => (
-                        <MenuItem key={alm.id} value={alm.id}>
-                          {labelAlmacen(alm)}
-                        </MenuItem>
-                      ))}
-                    {almacenContext && (
-                      <MenuItem value={almacenContext.id}>
-                        {almacenContext.nombre}
-                      </MenuItem>
-                    )}
-                  </Select>
-                  {errors.almacenId && (
-                    <FormHelperText>{errors.almacenId.message}</FormHelperText>
-                  )}
-                </FormControl>
-              )}
-            />
-
-            {/* MODELO + botón agregar modelo 🆕 */}
-            <Controller
-              name="modeloId"
-              control={control}
-              rules={{ required: "El modelo es requerido" }}
-              render={({ field }) => (
-                <>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      mt: 1,
-                    }}
-                  >
+              rules={{
+                required: "Debe seleccionar un almacén",
+              }}
+              render={({ field, fieldState }) => (
+                <Box>
+                  <Box sx={{ display: "flex", gap: 1 }}>
                     <FormControl
                       fullWidth
                       size="small"
-                      margin="dense"
-                      error={!!errors.modeloId}
-                      disabled={loading}
+                      error={!!fieldState.error}
+                      disabled={loading || !!almacenContext}
                     >
-                      <InputLabel id="modelo-label">Modelo</InputLabel>
+                      <InputLabel id="almacen-label">Almacén *</InputLabel>
+
                       <Select
                         {...field}
-                        labelId="modelo-label"
-                        label="Modelo"
+                        labelId="almacen-label"
+                        label="Almacén *"
                         value={field.value ?? ""}
+                        renderValue={(selected) => {
+                          const almacen = almacenesLocal.find(
+                            (a) => Number(a.id) === Number(selected)
+                          );
+
+                          if (!almacen) return "Seleccione un almacén";
+
+                          return labelAlmacen(almacen);
+                        }}
+                        MenuProps={{
+                          sx: { zIndex: 2000 },
+                        }}
                       >
-                        {modelosLocal.map((mod) => (
-                          <MenuItem key={mod.id} value={mod.id}>
-                            {labelModelo(mod)}
+                        {!almacenContext && (
+                          <MenuItem value="">
+                            <em>Seleccione un almacén</em>
                           </MenuItem>
-                        ))}
+                        )}
+
+                        {almacenContext ? (
+                          <MenuItem value={almacenContext.id}>
+                            {labelAlmacen(almacenContext)}
+                          </MenuItem>
+                        ) : (
+                          almacenesLocal.map((alm) => (
+                            <MenuItem key={alm.id} value={alm.id}>
+                              <Box>
+                                <Typography variant="body2">
+                                {alm.nombre}
+                              </Typography>
+                              </Box>
+                            </MenuItem>
+                          ))
+                        )}
                       </Select>
-                      {errors.modeloId && (
-                        <FormHelperText>
-                          {errors.modeloId.message}
-                        </FormHelperText>
-                      )}
                     </FormControl>
 
-                    <Tooltip title="Agregar nuevo modelo">
+                    <Tooltip title="Agregar nuevo almacén">
                       <span>
                         <IconButton
                           color="primary"
-                          size="small"
-                          onClick={() => setOpenModeloForm(true)}
-                          disabled={loading}
+                          onClick={() => setOpenAlmacenForm(true)}
+                          disabled={loading || !!almacenContext}
                           sx={{
-                            border: "1px solid",
-                            borderColor: "divider",
-                            ml: 0.5,
+                            width: 40,
+                            height: 40,
+                            border: "1px solid #D0D5DD",
+                            borderRadius: 1.2,
+                            flexShrink: 0,
                           }}
                         >
                           <Add fontSize="small" />
@@ -338,33 +380,110 @@ export default function SeccionForm({
                       </span>
                     </Tooltip>
                   </Box>
-                </>
+
+                  <Typography
+                    variant="caption"
+                    color={fieldState.error ? "error" : "text.secondary"}
+                    sx={{ mt: 0.5, ml: 1.8, display: "block" }}
+                  >
+                    {fieldState.error?.message ||
+                      "Seleccione el almacén donde estará la sección"}
+                  </Typography>
+                </Box>
               )}
             />
 
-            {/* DESCRIPCIÓN */}
+            <Controller
+              name="modeloId"
+              control={control}
+              rules={{
+                required: "Debe seleccionar un modelo",
+              }}
+              render={({ field, fieldState }) => (
+                <Box>
+                  <Box sx={{ display: "flex", gap: 1 }}>
+                    <FormControl
+                      fullWidth
+                      size="small"
+                      error={!!fieldState.error}
+                      disabled={loading}
+                    >
+                      <InputLabel id="modelo-label">Modelo *</InputLabel>
+
+                      <Select
+                        {...field}
+                        labelId="modelo-label"
+                        label="Modelo *"
+                        value={field.value ?? ""}
+                        MenuProps={{
+                          sx: { zIndex: 2000 },
+                        }}
+                      >
+                        <MenuItem value="">
+                          <em>Seleccione un modelo</em>
+                        </MenuItem>
+
+                        {modelosLocal.map((mod) => (
+                          <MenuItem key={mod.id} value={mod.id}>
+                            {labelModelo(mod)}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+
+                    <Tooltip title="Agregar nuevo modelo">
+                      <span>
+                        <IconButton
+                          color="primary"
+                          onClick={() => setOpenModeloForm(true)}
+                          disabled={loading}
+                          sx={{
+                            width: 40,
+                            height: 40,
+                            border: "1px solid #D0D5DD",
+                            borderRadius: 1.2,
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Add fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </Box>
+
+                  <Typography
+                    variant="caption"
+                    color={fieldState.error ? "error" : "text.secondary"}
+                    sx={{ mt: 0.5, ml: 1.8, display: "block" }}
+                  >
+                    {fieldState.error?.message ||
+                      "Seleccione el modelo asociado a la sección"}
+                  </Typography>
+                </Box>
+              )}
+            />
+
             <Controller
               name="descripcion"
               control={control}
               rules={{
-                required: "La descripción es requerida",
+                required: "La descripción es obligatoria",
                 maxLength: {
                   value: 500,
                   message: "Máximo 500 caracteres",
                 },
               }}
-              render={({ field }) => (
+              render={({ field, fieldState }) => (
                 <TextField
                   {...field}
-                  margin="dense"
-                  label="Descripción"
                   fullWidth
                   size="small"
                   multiline
                   rows={3}
+                  label="Descripción"
                   disabled={loading}
-                  error={!!errors.descripcion}
-                  helperText={errors.descripcion?.message || "Obligatorio"}
+                  error={!!fieldState.error}
+                  helperText={fieldState.error?.message || "Obligatorio"}
                 />
               )}
             />
@@ -377,19 +496,29 @@ export default function SeccionForm({
           </Box>
         </DialogContent>
 
+        <Divider />
+
         <DialogActions sx={{ px: 3, pb: 2.5, gap: 1.5 }}>
           <Button
-            onClick={() => onClose(false)}
+            onClick={() => onClose?.(false)}
             variant="outlined"
             disabled={loading}
             sx={{
               textTransform: "none",
               borderRadius: 999,
               px: 3,
+              borderColor: "#e0e0e0",
+              color: "rgba(0,0,0,0.7)",
+              "&:hover": {
+                borderColor: "#d32f2f",
+                color: "#d32f2f",
+                backgroundColor: "rgba(211,47,47,0.04)",
+              },
             }}
           >
             Cancelar
           </Button>
+
           <Button
             onClick={handleSubmit(onSubmit)}
             variant="contained"
@@ -404,6 +533,7 @@ export default function SeccionForm({
               "&:hover": {
                 background:
                   "linear-gradient(135deg, #0D8C47 0%, #0A6B37 100%)",
+                boxShadow: "0 4px 12px rgba(20,174,92,0.4)",
               },
             }}
           >
@@ -412,7 +542,18 @@ export default function SeccionForm({
         </DialogActions>
       </Dialog>
 
-      {/* 🆕 Modal para crear un nuevo modelo */}
+      {openAlmacenForm && (
+        <AlmacenForm
+          initialData={null}
+          sucursales={sucursalesLocal}
+          onClose={() => setOpenAlmacenForm(false)}
+          onSuccess={(nuevoAlmacen) => {
+            handleAlmacenCreated(nuevoAlmacen);
+            setOpenAlmacenForm(false);
+          }}
+        />
+      )}
+
       {openModeloForm && (
         <ModeloProductoForm
           initialData={null}

@@ -14,90 +14,86 @@ import {
 } from "@mui/material";
 import ServiceProveedor from "@/services/ServiceProveedor";
 
+const initialTouched = {
+  razonSocial: false,
+  telefono: false,
+  encargado: false,
+  direccion: false,
+  ci: false,
+};
+
+const regex = {
+  razonSocial: /^[A-Za-zÁÉÍÓÚáéíóúÑñ0-9 .,-]+$/,
+  encargado: /^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$/,
+  direccion: /^[A-Za-zÁÉÍÓÚáéíóúÑñ0-9 #.,\-\/]+$/,
+  ci: /^\d{7,8}$/,
+  telefono: /^\d{7,10}$/,
+};
+
 const ProveedorForm = ({ onClose, onSuccess, initialData = null }) => {
   const [form, setForm] = useState({
-    razonSocial: initialData?.razonSocial || "",
-    telefono: initialData?.telefono || "",
-    encargado: initialData?.encargado || "",
-    direccion: initialData?.direccion || "",
-    ci: initialData?.ci || "",
+    razonSocial: "",
+    telefono: "",
+    encargado: "",
+    direccion: "",
+    ci: "",
   });
 
-  // 👇 ahora touched por campo
-  const [touched, setTouched] = useState({
-    razonSocial: false,
-    telefono: false,
-    encargado: false,
-    direccion: false,
-    ci: false,
-  });
-
+  const [touched, setTouched] = useState(initialTouched);
   const [formError, setFormError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // regex permitidos
-  const regexRazon = /^[A-Za-zÁÉÍÓÚáéíóúÑñ0-9 .,-]+$/; // sin símbolos raros
-  const regexEncargado = /^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$/; // solo nombre
-  const regexDireccion = /^[A-Za-zÁÉÍÓÚáéíóúÑñ0-9 #.,\-\/]+$/; // un poco más permisiva
-
   const handleChange = (field, value) => {
-    // limpieza por campo
     let newValue = value;
 
-    if (field === "razonSocial") {
-      // no dejar caracteres raros pero sí espacios y ., -
-      newValue = newValue.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ0-9 .,-]/g, "");
-    }
+    const cleaners = {
+      razonSocial: /[^A-Za-zÁÉÍÓÚáéíóúÑñ0-9 .,-]/g,
+      encargado: /[^A-Za-zÁÉÍÓÚáéíóúÑñ ]/g,
+      direccion: /[^A-Za-zÁÉÍÓÚáéíóúÑñ0-9 #.,\-\/]/g,
+      ci: /\D/g,
+      telefono: /\D/g,
+    };
 
-    if (field === "encargado") {
-      // solo letras y espacios
-      newValue = newValue.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ ]/g, "");
-    }
-
-    if (field === "ci") {
-      newValue = newValue.replace(/\D/g, "");
-    }
-
-    if (field === "telefono") {
-      newValue = newValue.replace(/\D/g, "");
-    }
-
-    if (field === "direccion") {
-      // permitimos algunos
-      newValue = newValue.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ0-9 #.,\-\/]/g, "");
-    }
+    newValue = newValue.replace(cleaners[field], "");
 
     setForm((prev) => ({ ...prev, [field]: newValue }));
     setTouched((prev) => ({ ...prev, [field]: true }));
+    setFormError("");
   };
 
   const validateForm = () => {
-    if (!form.razonSocial || !form.telefono || !form.encargado || !form.direccion || !form.ci) {
+    if (
+      !form.razonSocial ||
+      !form.telefono ||
+      !form.encargado ||
+      !form.direccion ||
+      !form.ci
+    ) {
       setFormError("Por favor complete todos los campos obligatorios");
       return false;
     }
 
-    if (!regexRazon.test(form.razonSocial)) {
+    if (!regex.razonSocial.test(form.razonSocial)) {
       setFormError("La razón social no debe contener caracteres especiales");
       return false;
     }
 
-    if (!regexEncargado.test(form.encargado)) {
+    if (!regex.encargado.test(form.encargado)) {
       setFormError("El nombre del encargado solo debe tener letras y espacios");
       return false;
     }
 
-    if (!/^\d{7,8}$/.test(form.ci)) {
+    if (!regex.ci.test(form.ci)) {
       setFormError("El CI debe tener 7 u 8 dígitos");
       return false;
     }
 
-    if (!/^\d{7,10}$/.test(form.telefono)) {
+    if (!regex.telefono.test(form.telefono)) {
       setFormError("El teléfono debe tener entre 7 y 10 dígitos");
       return false;
     }
 
-    if (!regexDireccion.test(form.direccion)) {
+    if (!regex.direccion.test(form.direccion)) {
       setFormError("La dirección contiene caracteres no permitidos");
       return false;
     }
@@ -107,9 +103,8 @@ const ProveedorForm = ({ onClose, onSuccess, initialData = null }) => {
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
-    setFormError("");
 
-    // marcar todos como tocados al enviar
+    setFormError("");
     setTouched({
       razonSocial: true,
       telefono: true,
@@ -121,8 +116,16 @@ const ProveedorForm = ({ onClose, onSuccess, initialData = null }) => {
     if (!validateForm()) return;
 
     setLoading(true);
+
     try {
-      const payload = { ...form };
+      const payload = {
+        razonSocial: form.razonSocial.trim(),
+        telefono: form.telefono.trim(),
+        encargado: form.encargado.trim(),
+        direccion: form.direccion.trim(),
+        ci: form.ci.trim(),
+      };
+
       if (initialData?.id) {
         await ServiceProveedor.update(initialData.id, payload);
         toast.success("Proveedor actualizado correctamente");
@@ -130,12 +133,15 @@ const ProveedorForm = ({ onClose, onSuccess, initialData = null }) => {
         await ServiceProveedor.create(payload);
         toast.success("Proveedor creado correctamente");
       }
+
       onSuccess?.();
       onClose?.();
     } catch (err) {
-      console.error("Error submitting proveedor form:", err);
       const msg =
-        err.response?.data?.detail || err.message || "Error al procesar el proveedor";
+        err.response?.data?.detail ||
+        err.message ||
+        "Error al procesar el proveedor";
+
       setFormError(msg);
       toast.error(msg);
     } finally {
@@ -151,154 +157,136 @@ const ProveedorForm = ({ onClose, onSuccess, initialData = null }) => {
       direccion: initialData?.direccion || "",
       ci: initialData?.ci || "",
     });
+
     setFormError("");
-    // reset touched
-    setTouched({
-      razonSocial: false,
-      telefono: false,
-      encargado: false,
-      direccion: false,
-      ci: false,
-    });
+    setTouched(initialTouched);
   }, [initialData]);
+
+  const campos = [
+    {
+      field: "razonSocial",
+      label: "Razón Social",
+      value: form.razonSocial,
+      error: touched.razonSocial && (!form.razonSocial || !regex.razonSocial.test(form.razonSocial)),
+      helper:
+        touched.razonSocial && !form.razonSocial
+          ? "Campo requerido"
+          : touched.razonSocial && !regex.razonSocial.test(form.razonSocial)
+          ? "No se permiten caracteres especiales"
+          : "Obligatorio",
+    },
+    {
+      field: "encargado",
+      label: "Encargado",
+      value: form.encargado,
+      error: touched.encargado && (!form.encargado || !regex.encargado.test(form.encargado)),
+      helper:
+        touched.encargado && !form.encargado
+          ? "Campo requerido"
+          : touched.encargado && !regex.encargado.test(form.encargado)
+          ? "Solo letras y espacios"
+          : "Obligatorio",
+    },
+    {
+      field: "ci",
+      label: "CI",
+      value: form.ci,
+      error: touched.ci && (!form.ci || !regex.ci.test(form.ci)),
+      helper:
+        touched.ci && (!form.ci || !regex.ci.test(form.ci))
+          ? "Debe tener 7 u 8 dígitos"
+          : "Obligatorio",
+      props: { inputProps: { maxLength: 8 } },
+    },
+    {
+      field: "telefono",
+      label: "Teléfono",
+      value: form.telefono,
+      error: touched.telefono && (!form.telefono || !regex.telefono.test(form.telefono)),
+      helper:
+        touched.telefono && (!form.telefono || !regex.telefono.test(form.telefono))
+          ? "Ingrese un teléfono válido"
+          : "Obligatorio",
+      props: { inputProps: { maxLength: 10 } },
+    },
+    {
+      field: "direccion",
+      label: "Dirección",
+      value: form.direccion,
+      error: touched.direccion && (!form.direccion || !regex.direccion.test(form.direccion)),
+      helper:
+        touched.direccion && !form.direccion
+          ? "Campo requerido"
+          : touched.direccion && !regex.direccion.test(form.direccion)
+          ? "Carácter no permitido"
+          : "Obligatorio",
+      full: true,
+    },
+  ];
 
   return (
     <Dialog
-      open={true} // si lo controlas desde afuera, cambia esto
+      open
       onClose={onClose}
       maxWidth="sm"
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 2,
-          overflow: "visible",
+          borderRadius: 3,
+          overflow: "hidden",
+          boxShadow: "0 12px 36px rgba(0,0,0,0.18)",
         },
       }}
     >
       <DialogTitle
         sx={{
-          borderBottom: "1px solid",
-          borderColor: "divider",
+          p: 2.5,
           pb: 2,
+          background: "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
+          color: "#F5F5F5",
         }}
       >
-        <Typography variant="h6" fontWeight={600}>
+        <Typography component="div" variant="h6" fontWeight={700}>
           {initialData ? "Editar Proveedor" : "Nuevo Proveedor"}
+        </Typography>
+
+        <Typography component="div" variant="body2" sx={{ opacity: 0.9, mt: 0.5 }}>
+          Complete la información del proveedor.
         </Typography>
       </DialogTitle>
 
-      <DialogContent
-        sx={{
-          py: 3,
-          overflow: "visible",
-          maxHeight: "65vh",
-        }}
-      >
-        <Box component="form" onSubmit={handleSubmit} noValidate>
+      <DialogContent sx={{ py: 3, px: 3, bgcolor: "#FAFAFA" }}>
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
+          noValidate
+          sx={{
+            bgcolor: "#FFFFFF",
+            borderRadius: 2,
+            p: 2.5,
+            boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+          }}
+        >
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Razón Social"
-                value={form.razonSocial}
-                onChange={(e) => handleChange("razonSocial", e.target.value)}
-                error={
-                  touched.razonSocial &&
-                  (!form.razonSocial || !regexRazon.test(form.razonSocial))
-                }
-                helperText={
-                  touched.razonSocial && !form.razonSocial
-                    ? "Campo requerido"
-                    : touched.razonSocial && !regexRazon.test(form.razonSocial)
-                    ? "No se permiten caracteres especiales"
-                    : ""
-                }
-                required
-                disabled={loading}
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Encargado"
-                value={form.encargado}
-                onChange={(e) => handleChange("encargado", e.target.value)}
-                error={
-                  touched.encargado &&
-                  (!form.encargado || !regexEncargado.test(form.encargado))
-                }
-                helperText={
-                  touched.encargado && !form.encargado
-                    ? "Campo requerido"
-                    : touched.encargado && !regexEncargado.test(form.encargado)
-                    ? "Solo letras y espacios"
-                    : ""
-                }
-                required
-                disabled={loading}
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="CI"
-                value={form.ci}
-                onChange={(e) => handleChange("ci", e.target.value)}
-                error={touched.ci && (!form.ci || !/^\d{7,8}$/.test(form.ci))}
-                helperText={
-                  touched.ci && (!form.ci || !/^\d{7,8}$/.test(form.ci))
-                    ? "Debe tener 7 u 8 dígitos"
-                    : ""
-                }
-                required
-                disabled={loading}
-                inputProps={{ maxLength: 8 }}
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Teléfono"
-                value={form.telefono}
-                onChange={(e) => handleChange("telefono", e.target.value)}
-                error={
-                  touched.telefono && (!form.telefono || !/^\d{7,10}$/.test(form.telefono))
-                }
-                helperText={
-                  touched.telefono && (!form.telefono || !/^\d{7,10}$/.test(form.telefono))
-                    ? "Ingrese un teléfono válido"
-                    : ""
-                }
-                required
-                disabled={loading}
-                inputProps={{ maxLength: 10 }}
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Dirección"
-                value={form.direccion}
-                onChange={(e) => handleChange("direccion", e.target.value)}
-                error={
-                  touched.direccion &&
-                  (!form.direccion || !regexDireccion.test(form.direccion))
-                }
-                helperText={
-                  touched.direccion && !form.direccion
-                    ? "Campo requerido"
-                    : touched.direccion && !regexDireccion.test(form.direccion)
-                    ? "Caracter no permitido"
-                    : ""
-                }
-                required
-                disabled={loading}
-              />
-            </Grid>
+            {campos.map((item) => (
+              <Grid
+                size={{ xs: 12, sm: item.full ? 12 : 6 }}
+                key={item.field}
+              >
+                <TextField
+                  fullWidth
+                  size="small"
+                  label={item.label}
+                  value={item.value}
+                  onChange={(e) => handleChange(item.field, e.target.value)}
+                  error={!!item.error}
+                  helperText={item.helper}
+                  required
+                  disabled={loading}
+                  {...(item.props || {})}
+                />
+              </Grid>
+            ))}
           </Grid>
 
           {formError && (
@@ -309,15 +297,43 @@ const ProveedorForm = ({ onClose, onSuccess, initialData = null }) => {
         </Box>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
-        <Button onClick={onClose} variant="outlined" disabled={loading}>
+      <DialogActions sx={{ px: 3, py: 2.5, gap: 1.5 }}>
+        <Button
+          onClick={onClose}
+          variant="outlined"
+          disabled={loading}
+          sx={{
+            textTransform: "none",
+            borderRadius: 999,
+            px: 3,
+            borderColor: "#e0e0e0",
+            color: "rgba(0,0,0,0.7)",
+            "&:hover": {
+              borderColor: "#d32f2f",
+              color: "#d32f2f",
+              backgroundColor: "rgba(211,47,47,0.04)",
+            },
+          }}
+        >
           Cancelar
         </Button>
+
         <Button
           onClick={handleSubmit}
           variant="contained"
           disabled={loading}
-          sx={{ minWidth: 100 }}
+          sx={{
+            textTransform: "none",
+            borderRadius: 999,
+            px: 4,
+            minWidth: 140,
+            fontWeight: 600,
+            background: "linear-gradient(135deg, #14AE5C 0%, #0D8C47 100%)",
+            "&:hover": {
+              background: "linear-gradient(135deg, #0D8C47 0%, #0A6B37 100%)",
+              boxShadow: "0 4px 12px rgba(20,174,92,0.4)",
+            },
+          }}
         >
           {loading ? "Guardando..." : "Guardar"}
         </Button>

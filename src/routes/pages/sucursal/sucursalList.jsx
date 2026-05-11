@@ -1,5 +1,4 @@
 // src/routes/pages/sucursal/SucursalList.jsx
-
 import { useState, useEffect } from "react";
 import {
   Box,
@@ -11,10 +10,12 @@ import {
   IconButton,
   Button,
   CircularProgress,
+  TextField,
+  MenuItem,
 } from "@mui/material";
 
 import { Eye, PencilLine, Trash2, MapPin } from "lucide-react";
-
+import ServiceCiudad from "@/services/ServiceCiudad";
 import DetailsDialog from "@/components/details";
 import DeleteConfirm from "@/components/deleteConfirm";
 import SucursalForm from "./sucursalForm";
@@ -36,7 +37,8 @@ const SucursalList = () => {
   // 🔥 estado para ver almacenes
   const [openAlmacenesDialog, setOpenAlmacenesDialog] = useState(false);
   const [sucursalSeleccionada, setSucursalSeleccionada] = useState(null);
-
+  const [ciudadFiltro, setCiudadFiltro] = useState("");
+  const [ciudades, setCiudades] = useState([]);
   const { user } = useAuth();
   const roleKey = (user?.rol || "").trim().toLowerCase();
 
@@ -56,11 +58,22 @@ const SucursalList = () => {
       format: (v) => (v ? new Date(v).toLocaleString() : "—"),
     },
   ];
-
+  const fetchCiudades = async () => {
+    try {
+      const res = await ServiceCiudad.getAll();
+      setCiudades(res.items || []);
+    } catch (error) {
+      console.error(error);
+    }
+  };
   const fetchSucursales = async () => {
     try {
       setLoading(true);
-      const res = await ServiceSucursal.getAll();
+      const params = {};
+      if (ciudadFiltro) {
+        params.ciudadId = ciudadFiltro;
+      }
+      const res = await ServiceSucursal.getAll(params);
       setSucursales(res.items || []);
     } catch (error) {
       toast.error(error.message || "Error al cargar sucursales");
@@ -68,10 +81,13 @@ const SucursalList = () => {
       setLoading(false);
     }
   };
+  useEffect(() => {
+    fetchCiudades();
+  }, []);
 
   useEffect(() => {
     fetchSucursales();
-  }, []);
+  }, [ciudadFiltro]);
 
   const handleDelete = async () => {
     try {
@@ -105,6 +121,7 @@ const SucursalList = () => {
     <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
       
       {/* HEADER */}
+      
       <Box
         sx={{
           mb: 4,
@@ -154,7 +171,37 @@ const SucursalList = () => {
           </Button>
         )}
       </Box>
+    <Box
+      sx={{
+        mb: 3,
+        display: "flex",
+        justifyContent: "flex-start",
+      }}
+    >
+      <TextField
+        select
+        size="small"
+        label="Filtrar por ciudad"
+        value={ciudadFiltro}
+        onChange={(e) => setCiudadFiltro(e.target.value)}
+        sx={{
+          width: 280,
+          bgcolor: "#fff",
+          borderRadius: 2,
+          "& .MuiOutlinedInput-root": {
+            borderRadius: 2,
+          },
+        }}
+      >
+        <MenuItem value="">Todas las ciudades</MenuItem>
 
+        {ciudades.map((c) => (
+          <MenuItem key={c.id} value={c.id}>
+            {c.nombre}
+          </MenuItem>
+        ))}
+      </TextField>
+    </Box>
       {/* LOADING */}
       {loading && (
         <Box sx={{ py: 6, display: "flex", justifyContent: "center" }}>

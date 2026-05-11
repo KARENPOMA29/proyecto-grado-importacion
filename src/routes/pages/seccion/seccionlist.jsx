@@ -5,7 +5,7 @@ import DeleteConfirm from "@/components/deleteConfirm";
 import DetailsDialog from "@/components/details";
 import SeccionForm from "./seccionForm";
 import { toast } from "react-toastify";
-
+import { Box, Typography, Button } from "@mui/material";
 import { useAuth } from "@/context/AuthContext"; // 👈
 import ServiceSeccion from "@/services/ServiceSeccion";
 import ServiceAlmacen from "@/services/ServiceAlmacen";
@@ -45,9 +45,20 @@ const SeccionList = () => {
         const almList = Array.isArray(almRes) ? almRes : almRes.items ?? [];
         setAlmacenes(almList);
 
-        const modRes = await ServiceModeloProducto.getAll();
-        const modListRaw = Array.isArray(modRes) ? modRes : modRes.items ?? [];
-        const modList = modListRaw.map((m) => ({ ...m, _nombre: resolveModelName(m) }));
+        const modRes = await ServiceModeloProducto.getAll({
+          page: 1,
+          pageSize: 1000,
+        });
+
+        const modListRaw = Array.isArray(modRes)
+          ? modRes
+          : modRes.items ?? [];
+
+        const modList = modListRaw.map((m) => ({
+          ...m,
+          _nombre: resolveModelName(m),
+        }));
+
         setModelos(modList);
       } catch (e) {
         console.error("Error cargando catálogos:", e);
@@ -70,41 +81,57 @@ const SeccionList = () => {
 
   const columns = [
     {
+      name: "Nombre",
+      selector: (r) => r.nombre ?? "—",
+      sortable: true,
+      minWidth: "180px",
+    },
+    {
       name: "Almacén",
-      selector: (r) => almacenMap[r.almacenId] ?? "—",
+      selector: (r) => r.almacenNombre ?? "—",
       sortable: true,
       minWidth: "180px",
     },
     {
       name: "Modelo",
-      selector: (r) => modeloMap[r.modeloId] ?? "—",
+      selector: (r) => r.modeloNombre ?? "—",
       sortable: true,
       minWidth: "180px",
     },
     {
-      name: "Descripción",
-      selector: (r) => r.descripcion ?? "—",
-      sortable: true,
-      minWidth: "240px",
-      grow: 2,
-    },
-    {
       name: "Registrado",
       selector: (r) =>
-        r.fechaRegistro ? new Date(r.fechaRegistro).toLocaleString() : "—",
+        r.fechaRegistro
+          ? new Date(r.fechaRegistro).toLocaleDateString()
+          : "—",
       sortable: true,
       minWidth: "200px",
     },
   ];
-
   const detailsFields = [
-    { label: "Almacén", key: "almacenId", format: (v) => almacenMap[v] ?? "—" },
-    { label: "Modelo", key: "modeloId", format: (v) => modeloMap[v] ?? "—" },
+    { label: "Nombre", key: "nombre" },
+
+    {
+      label: "Almacén",
+      key: "almacenId",
+      format: (v) => almacenMap[v] ?? `Almacén #${v}`,
+    },
+
+    {
+      label: "Modelo",
+      key: "modeloId",
+      format: (v) => modeloMap[v] ?? `Modelo #${v}`,
+    },
+
     { label: "Descripción", key: "descripcion" },
+
     {
       label: "Fecha Registro",
       key: "fechaRegistro",
-      format: (v) => (v ? new Date(v).toLocaleString() : "—"),
+      format: (v) =>
+      v
+        ? new Date(v).toLocaleDateString()
+        : "—",
     },
   ];
 
@@ -131,38 +158,78 @@ const SeccionList = () => {
   };
 
   return (
-    <div className="flex flex-col gap-y-6 p-4 sm:p-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-          Gestión de Secciones
-        </h1>
+    <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
+      <Box
+        sx={{
+          mb: 4,
+          display: "flex",
+          flexDirection: { xs: "column", md: "row" },
+          alignItems: { xs: "flex-start", md: "center" },
+          justifyContent: "space-between",
+          gap: 2,
+        }}
+      >
+        <Box>
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 700,
+              color: "#3A1A1A",
+              mb: 1,
+              lineHeight: 1.1,
+            }}
+          >
+            Gestión de Secciones
+          </Typography>
+
+          <Typography
+            variant="body1"
+            sx={{
+              color: "text.secondary",
+              fontSize: "1rem",
+            }}
+          >
+            Administra secciones registradas por almacén y modelo de producto.
+          </Typography>
+        </Box>
 
         {canCreate && (
-          <button
+          <Button
+            variant="contained"
             onClick={() => {
               setFormData(null);
               setShowForm(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 font-medium"
+            startIcon={<PencilLine size={18} />}
+            sx={{
+              borderRadius: 999,
+              px: 3.5,
+              py: 1.3,
+              fontWeight: 700,
+              textTransform: "none",
+              fontSize: "15px",
+              background: "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+              "&:hover": {
+                background: "linear-gradient(135deg, #3A1A1A 0%, #592B2B 100%)",
+                boxShadow: "0 6px 16px rgba(0,0,0,0.35)",
+              },
+            }}
           >
-            <PencilLine size={18} />
             Nueva Sección
-          </button>
+          </Button>
         )}
-      </div>
+      </Box>
 
       <GridGenerico
         ref={gridRef}
         service={ServiceSeccion}
         columns={columns}
-        title="Secciones"
         defaultSortField="fechaRegistro"
         defaultSortAsc={false}
         pageSize={10}
         renderActions={(row) => (
-          <div className="flex gap-x-2 justify-end">
-            {/* 👁 ver siempre */}
+          <div className="flex items-center justify-center gap-2 whitespace-nowrap">
             <button
               className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors duration-200"
               onClick={() => setSelectedId(row.id)}
@@ -171,7 +238,6 @@ const SeccionList = () => {
               <Eye size={16} />
             </button>
 
-            {/* ✏️ editar: Admin + Almacen */}
             {canEdit && (
               <button
                 className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors duration-200"
@@ -182,10 +248,9 @@ const SeccionList = () => {
               </button>
             )}
 
-            {/* 🗑️ eliminar: solo Admin */}
             {canDelete && (
               <button
-                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duración-200"
+                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duration-200"
                 onClick={() => setIdToDelete(row.id)}
                 title="Eliminar"
               >
@@ -208,7 +273,7 @@ const SeccionList = () => {
       {idToDelete && canDelete && (
         <DeleteConfirm
           title="¿Eliminar sección?"
-          message="Esta acción eliminará la sección permanentemente y no se podrá deshacer."
+          message="Esta acción eliminará la sección lógicamente y no se podrá deshacer."
           onConfirm={handleDelete}
           onCancel={() => setIdToDelete(null)}
         />
@@ -226,7 +291,7 @@ const SeccionList = () => {
           modelos={modelos}
         />
       )}
-    </div>
+    </Box>
   );
 };
 

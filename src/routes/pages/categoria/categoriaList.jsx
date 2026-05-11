@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { PencilLine, Trash, Eye } from "lucide-react";
+import { Box, Typography, Button } from "@mui/material";
 import GridGenerico from "@/components/Grid";
 import DetailsDialog from "@/components/details";
 import DeleteConfirm from "@/components/deleteConfirm";
@@ -16,11 +17,10 @@ const CategoriaList = () => {
   const gridRef = useRef(null);
 
   const { user } = useAuth();
-  // normalizamos solo para comparar
   const roleKey = (user?.rol || "").trim().toLowerCase();
 
   const canCreate = roleKey === "administrador" || roleKey === "almacen";
-  const canEdit   = roleKey === "administrador" || roleKey === "almacen";
+  const canEdit = roleKey === "administrador" || roleKey === "almacen";
   const canDelete = roleKey === "administrador";
 
   const columns = [
@@ -33,9 +33,7 @@ const CategoriaList = () => {
     },
   ];
 
-  const fields = [
-    { label: "Nombre", key: "nombre" },
-  ];
+  const fields = [{ label: "Nombre", key: "nombre" }];
 
   const handleDelete = async () => {
     try {
@@ -60,26 +58,70 @@ const CategoriaList = () => {
   };
 
   return (
-    <div className="flex flex-col gap-y-6 p-4 sm:p-6">
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-          Gestión de Categorías
-        </h1>
+    <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
+      <Box
+        sx={{
+          mb: 4,
+          display: "flex",
+          flexDirection: { xs: "column", md: "row" },
+          alignItems: { xs: "flex-start", md: "center" },
+          justifyContent: "space-between",
+          gap: 2,
+        }}
+      >
+        <Box>
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 700,
+              color: "#3A1A1A",
+              mb: 1,
+              lineHeight: 1.1,
+            }}
+          >
+            Gestión de Categorías
+          </Typography>
+
+          <Typography
+            variant="body1"
+            sx={{
+              color: "text.secondary",
+              fontSize: "1rem",
+            }}
+          >
+            Administra las categorías registradas y consulta su información.
+          </Typography>
+        </Box>
 
         {canCreate && (
-          <button
+          <Button
+            variant="contained"
             onClick={() => {
               setFormData(null);
               setShowForm(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 font-medium"
+            startIcon={<PencilLine size={18} />}
+            sx={{
+              borderRadius: 999,
+              px: 3.5,
+              py: 1.3,
+              fontWeight: 700,
+              textTransform: "none",
+              fontSize: "15px",
+              background:
+                "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+              "&:hover": {
+                background:
+                  "linear-gradient(135deg, #3A1A1A 0%, #592B2B 100%)",
+                boxShadow: "0 6px 16px rgba(0,0,0,0.35)",
+              },
+            }}
           >
-            <PencilLine size={18} />
             Nueva Categoría
-          </button>
+          </Button>
         )}
-      </div>
+      </Box>
 
       <GridGenerico
         ref={gridRef}
@@ -89,7 +131,7 @@ const CategoriaList = () => {
         defaultSortAsc={true}
         pageSize={10}
         renderActions={(row) => (
-          <div className="flex items-center justify-center gap-2 whitespace-nowrap w-full">
+          <div className="flex items-center justify-center gap-2 whitespace-nowrap">
             <button
               className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors duration-200"
               onClick={() => setSelectedId(row.id)}
@@ -132,7 +174,7 @@ const CategoriaList = () => {
       {idToDelete && canDelete && (
         <DeleteConfirm
           title="¿Eliminar categoría?"
-          message="Esta acción eliminará la categoría permanentemente y no se podrá deshacer."
+          message="Esta acción eliminará la categoría lógicamente y no se podrá deshacer."
           onConfirm={handleDelete}
           onCancel={() => setIdToDelete(null)}
         />
@@ -148,7 +190,7 @@ const CategoriaList = () => {
           }}
         />
       )}
-    </div>
+    </Box>
   );
 };
 

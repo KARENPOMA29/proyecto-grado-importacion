@@ -19,14 +19,39 @@ import {
   Tooltip,
 } from "@mui/material";
 
-import { Add } from "@mui/icons-material";
+import {
+  Add,
+  PhotoCamera,
+  ImageOutlined,
+} from "@mui/icons-material";
 import { toast } from "react-toastify";
 
 import ServiceModeloProducto from "@/services/ServiceModeloProducto";
 import ServiceMarca from "@/services/ServiceMarca";
 import MarcaForm from "@/routes/pages/marcas/MarcaForm"; // ajusta la ruta si hace falta
 
-const UNIDADES = ["Unidades", "Litros", "Kg", "Metros", "Pies³", "BTU"];
+const UNIDADES = [
+  "L",
+  "kg",
+  "°C",
+  "dB(A)",
+  "L/ciclo",
+  "W",
+  "BTU/h",
+  "kW",
+];
+const COLORES = [
+  "Blanco",
+  "Negro",
+  "Gris",
+  "Plateado",
+  "Acero inoxidable",
+  "Rojo",
+  "Azul",
+  "Beige",
+  "Marrón",
+  "Dorado",
+];
 
 const TIPOS_GARANTIA = [
   { value: "DIAS", label: "Días" },
@@ -178,12 +203,13 @@ const ModeloProductoForm = ({ onClose, onSuccess, initialData = null }) => {
   };
 
   const validate = () => {
-    if (!form.nombreModelo) {
+    if (!form.nombreModelo.trim()) {
       setErrorMsg("Ingresa el nombre del modelo.");
       return false;
     }
+
     if (!regexNombreModelo.test(form.nombreModelo)) {
-      setErrorMsg("El nombre del modelo solo puede contener letras y números.");
+      setErrorMsg("El nombre del modelo solo puede contener letras, números y símbolos simples.");
       return false;
     }
 
@@ -193,28 +219,29 @@ const ModeloProductoForm = ({ onClose, onSuccess, initialData = null }) => {
     }
 
     if (!form.color) {
-      setErrorMsg("Ingresa un color para el modelo.");
+      setErrorMsg("Selecciona un color para el modelo.");
       return false;
     }
-    if (!regexColor.test(form.color)) {
-      setErrorMsg("El color contiene caracteres no válidos.");
+
+    if (!form.capacidadOTamano) {
+      setErrorMsg("Ingresa la capacidad o tamaño del modelo.");
+      return false;
+    }
+
+    const capacidad = Number(form.capacidadOTamano);
+    if (Number.isNaN(capacidad) || capacidad <= 0) {
+      setErrorMsg("La capacidad o tamaño debe ser un número mayor a 0.");
+      return false;
+    }
+
+    if (!form.unidadMedida) {
+      setErrorMsg("Selecciona la unidad de medida.");
       return false;
     }
 
     const stockMin = Number(form.stockMinimo);
-    if (Number.isNaN(stockMin) || stockMin < 0) {
+    if (form.stockMinimo === "" || Number.isNaN(stockMin) || stockMin < 0) {
       setErrorMsg("El stock mínimo debe ser un número mayor o igual a 0.");
-      return false;
-    }
-
-    const stockAct = Number(form.stockActual);
-    if (Number.isNaN(stockAct) || stockAct < 0) {
-      setErrorMsg("El stock actual debe ser un número mayor o igual a 0.");
-      return false;
-    }
-
-    if (form.unidadMedida && !UNIDADES.includes(form.unidadMedida)) {
-      setErrorMsg("Selecciona una unidad de medida válida.");
       return false;
     }
 
@@ -224,17 +251,13 @@ const ModeloProductoForm = ({ onClose, onSuccess, initialData = null }) => {
       return false;
     }
 
-    if (
-      !form.tipoGarantia ||
-      !TIPOS_GARANTIA.some((t) => t.value === form.tipoGarantia)
-    ) {
+    if (!form.tipoGarantia) {
       setErrorMsg("Selecciona el tipo de garantía.");
       return false;
     }
 
     return true;
   };
-
   const handleUploadImage = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -283,9 +306,7 @@ const ModeloProductoForm = ({ onClose, onSuccess, initialData = null }) => {
       const payload = {
         nombreModelo: form.nombreModelo.trim(),
         idMarca: form.idMarca ? Number(form.idMarca) : null,
-        capacidadOTamano: form.capacidadOTamano
-          ? Number(form.capacidadOTamano)
-          : null,
+        capacidadOTamano: Number(form.capacidadOTamano),
         unidadMedida: form.unidadMedida || null,
         stockMinimo: Number(form.stockMinimo) || 0,
         stockActual: Number(form.stockActual) || 0,
@@ -327,13 +348,34 @@ const ModeloProductoForm = ({ onClose, onSuccess, initialData = null }) => {
     setMarcas((prev) => [...prev, nuevaMarca]);
     setForm((prev) => ({ ...prev, idMarca: String(nuevaMarca.id) }));
   };
+  const fieldSx = {
+    "& .MuiOutlinedInput-root": {
+      height: 48,
+      borderRadius: 1.2,
+      backgroundColor: "#fff",
+    },
+  };
+
+  const selectSx = {
+    height: 48,
+    borderRadius: 1.2,
+    backgroundColor: "#fff",
+    "& .MuiSelect-select": {
+      height: "48px !important",
+      display: "flex",
+      alignItems: "center",
+      boxSizing: "border-box",
+      paddingTop: "0 !important",
+      paddingBottom: "0 !important",
+    },
+  };
 
   return (
     <>
       <Dialog
         open={true}
         onClose={onClose}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
         PaperProps={{
           sx: {
@@ -375,25 +417,79 @@ const ModeloProductoForm = ({ onClose, onSuccess, initialData = null }) => {
               boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
             }}
           >
-            {/* SECCIÓN: Imagen */}
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-                Imagen del modelo
-              </Typography>
+          {/* SECCIÓN: Imagen */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
+              Imagen del modelo
+            </Typography>
+
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", md: "220px 1fr" },
+                gap: 2,
+                alignItems: "center",
+                p: 2,
+                border: "1px solid #E5E7EB",
+                borderRadius: 2,
+                bgcolor: "#FCFCFC",
+              }}
+            >
               <Box
                 sx={{
+                  width: "100%",
+                  height: 170,
+                  borderRadius: 2,
+                  border: "1px dashed #BDBDBD",
+                  bgcolor: "#F7F7F7",
                   display: "flex",
                   alignItems: "center",
-                  gap: 2,
-                  flexWrap: "wrap",
+                  justifyContent: "center",
+                  overflow: "hidden",
                 }}
               >
+                {previewSrc ? (
+                  <Box
+                    component="img"
+                    src={previewSrc}
+                    alt="Vista previa del modelo"
+                    sx={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                    onError={(e) => {
+                      e.target.style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <Box sx={{ textAlign: "center", color: "text.secondary" }}>
+                    <ImageOutlined sx={{ fontSize: 52, mb: 1, color: "#9CA3AF" }} />
+                    <Typography variant="body2">
+                      Sin imagen
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+
+              <Box>
                 <Button
-                  variant="outlined"
+                  variant="contained"
                   component="label"
                   disabled={uploadingImg || loading}
+                  startIcon={<PhotoCamera />}
+                  sx={{
+                    textTransform: "none",
+                    borderRadius: 999,
+                    px: 3,
+                    fontWeight: 600,
+                    background: "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
+                    "&:hover": {
+                      background: "linear-gradient(135deg, #3A1A1A 0%, #261010 100%)",
+                    },
+                  }}
                 >
-                  {uploadingImg ? "Subiendo..." : "Seleccionar imagen"}
+                  {uploadingImg ? "Subiendo imagen..." : "Seleccionar imagen"}
                   <input
                     type="file"
                     hidden
@@ -402,343 +498,352 @@ const ModeloProductoForm = ({ onClose, onSuccess, initialData = null }) => {
                   />
                 </Button>
 
-                <Typography variant="body2" color="text.secondary">
-                  Imagen opcional del modelo. Al escoger un archivo se subirá y
-                  verás una vista previa.
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 1.2, maxWidth: 420 }}
+                >
+                  Puedes subir una imagen del modelo. Se mostrará una vista previa antes de guardar.
                 </Typography>
-
-                {previewSrc && (
-                  <Box
-                    component="img"
-                    src={previewSrc}
-                    alt="Vista previa del modelo"
-                    sx={{
-                      width: 80,
-                      height: 80,
-                      borderRadius: 1,
-                      objectFit: "cover",
-                      border: "1px solid",
-                      borderColor: "divider",
-                    }}
-                    onError={(e) => {
-                      e.target.style.display = "none";
-                    }}
-                  />
-                )}
               </Box>
             </Box>
+          </Box>
 
-            {/* SECCIÓN: Datos generales */}
-            <Box sx={{ mb: 2 }}>
-              <Typography
-                variant="subtitle2"
-                fontWeight={600}
-                sx={{ mb: 1, mt: 1 }}
-              >
-                Datos generales
-              </Typography>
+          {/* SECCIÓN: Datos generales */}
+          <Box sx={{ mb: 2.5 }}>
+            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.2 }}>
+              Datos generales
+            </Typography>
 
-              <Grid container spacing={2}>
-                {/* NOMBRE MODELO */}
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    label="Nombre del Modelo *"
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  md: "1fr 1fr 1fr",
+                },
+                gap: 1.8,
+                alignItems: "start",
+              }}
+            >
+              <TextField
+                label="Nombre del Modelo *"
+                placeholder="Ej: WM42RT3S"
+                fullWidth
+                value={form.nombreModelo}
+                onChange={(e) => handleChange("nombreModelo", e.target.value)}
+                error={
+                  touched.nombreModelo &&
+                  (!form.nombreModelo || !regexNombreModelo.test(form.nombreModelo))
+                }
+                helperText={
+                  touched.nombreModelo && !form.nombreModelo
+                    ? "Campo obligatorio."
+                    : touched.nombreModelo && !regexNombreModelo.test(form.nombreModelo)
+                    ? "Solo letras, números y símbolos simples."
+                    : " "
+                }
+                disabled={isSaving}
+                required
+                size="small"
+                sx={fieldSx}
+              />
+
+              <Box>
+                <Box sx={{ display: "flex", gap: 1 }}>
+                  <FormControl
                     fullWidth
-                    value={form.nombreModelo}
-                    onChange={(e) =>
-                      handleChange("nombreModelo", e.target.value)
-                    }
-                    error={
-                      touched.nombreModelo &&
-                      (!form.nombreModelo ||
-                        !regexNombreModelo.test(form.nombreModelo))
-                    }
-                    helperText={
-                      touched.nombreModelo && !form.nombreModelo
-                        ? "Campo obligatorio."
-                        : touched.nombreModelo &&
-                          !regexNombreModelo.test(form.nombreModelo)
-                        ? "Solo letras, números y símbolos simples."
-                        : ""
-                    }
-                    disabled={isSaving}
-                    required
+                    disabled={isSaving || loadingMarcas}
+                    error={touched.idMarca && !form.idMarca}
                     size="small"
-                  />
-                </Grid>
-
-                {/* MARCA + botón agregar */}
-                <Grid item xs={12} md={4}>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                    }}
                   >
-                    <FormControl
-                      fullWidth
-                      disabled={isSaving || loadingMarcas}
-                      error={touched.idMarca && !form.idMarca}
-                      size="small"
-                    >
-                      <InputLabel id="marca-label">Marca *</InputLabel>
-                      <Select
-                        labelId="marca-label"
-                        label="Marca *"
-                        value={form.idMarca || ""}
-                        onChange={(e) => handleChange("idMarca", e.target.value)}
-                        MenuProps={{ sx: { zIndex: 2000 } }}
-                      >
-                        <MenuItem value="">
-                          <em>Selecciona una marca</em>
-                        </MenuItem>
-                        {marcas.map((m) => (
-                          <MenuItem key={m.id} value={String(m.id)}>
-                            {m.nombre}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-
-
-                    <Tooltip title="Agregar nueva marca">
-                      <span>
-                        <IconButton
-                          color="primary"
-                          size="small"
-                          onClick={() => setOpenMarcaForm(true)}
-                          disabled={isSaving}
-                          sx={{
-                            border: "1px solid",
-                            borderColor: "divider",
-                            ml: 0.5,
-                          }}
-                        >
-                          <Add fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  </Box>
-                  {touched.idMarca && !form.idMarca && (
-                    <Typography
-                      variant="caption"
-                      color="error"
-                      sx={{ mt: 0.5, display: "block" }}
-                    >
-                      Selecciona una marca.
-                    </Typography>
-                  )}
-                </Grid>
-
-                {/* COLOR */}
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    label="Color *"
-                    fullWidth
-                    value={form.color}
-                    onChange={(e) => handleChange("color", e.target.value)}
-                    error={
-                      touched.color &&
-                      (!form.color || !regexColor.test(form.color))
-                    }
-                    helperText={
-                      touched.color && !form.color
-                        ? "Campo obligatorio."
-                        : touched.color && !regexColor.test(form.color)
-                        ? "El color contiene caracteres no válidos."
-                        : ""
-                    }
-                    disabled={isSaving}
-                    required
-                    size="small"
-                  />
-                </Grid>
-              </Grid>
-            </Box>
-
-            {/* SECCIÓN: Capacidad y stock */}
-            <Box sx={{ mb: 2 }}>
-              <Typography
-                variant="subtitle2"
-                fontWeight={600}
-                sx={{ mb: 1, mt: 1 }}
-              >
-                Capacidad y stock
-              </Typography>
-
-              <Grid container spacing={2}>
-                {/* CAPACIDAD / TAMAÑO */}
-                <Grid item xs={12} md={3}>
-                  <TextField
-                    label="Capacidad/Tamaño"
-                    fullWidth
-                    type="number"
-                    inputMode="numeric"
-                    value={form.capacidadOTamano}
-                    onChange={(e) =>
-                      handleChange("capacidadOTamano", e.target.value)
-                    }
-                    helperText="Opcional. Solo números (ej: 3500)."
-                    disabled={isSaving}
-                    size="small"
-                    inputProps={{ min: 0 }}
-                  />
-                </Grid>
-
-                {/* UNIDAD DE MEDIDA */}
-                <Grid item xs={12} md={3}>
-                  <FormControl fullWidth disabled={isSaving} size="small">
-                    <InputLabel id="unidad-label">Unidad</InputLabel>
+                    <InputLabel id="marca-label">Marca *</InputLabel>
                     <Select
-                      labelId="unidad-label"
-                      label="Unidad"
-                      value={form.unidadMedida || ""}
-                      onChange={(e) =>
-                        handleChange("unidadMedida", e.target.value)
-                      }
-                      MenuProps={{ sx: { zIndex: 2000 } }}
+                      labelId="marca-label"
+                      label="Marca *"
+                      value={form.idMarca || ""}
+                      onChange={(e) => handleChange("idMarca", e.target.value)}
+                      sx={selectSx}
                     >
                       <MenuItem value="">
-                        <em>Sin unidad</em>
+                        <em>Selecciona una marca</em>
                       </MenuItem>
-                      {UNIDADES.map((u) => (
-                        <MenuItem key={u} value={u}>
-                          {u}
+
+                      {marcas.map((m) => (
+                        <MenuItem key={m.id} value={String(m.id)}>
+                          {m.nombre}
                         </MenuItem>
                       ))}
                     </Select>
                   </FormControl>
-                  <Typography variant="caption" color="text.secondary">
-                    Opcional.
+
+                  <Tooltip title="Agregar nueva marca">
+                    <span>
+                      <IconButton
+                        color="primary"
+                        onClick={() => setOpenMarcaForm(true)}
+                        disabled={isSaving}
+                        sx={{
+                          width: 48,
+                          height: 48,
+                          border: "1px solid #D0D5DD",
+                          borderRadius: 1.2,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Add fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                </Box>
+
+                {touched.idMarca && !form.idMarca ? (
+                  <Typography variant="caption" color="error">
+                    Selecciona una marca.
                   </Typography>
-                </Grid>
+                ) : (
+                  <Typography variant="caption" sx={{ visibility: "hidden" }}>
+                    espacio
+                  </Typography>
+                )}
+              </Box>
 
-                {/* STOCK MÍNIMO */}
-                <Grid item xs={12} md={3}>
-                  <TextField
-                    label="Stock mínimo *"
-                    fullWidth
-                    type="number"
-                    inputMode="numeric"
-                    value={form.stockMinimo}
-                    onChange={(e) =>
-                      handleChange("stockMinimo", e.target.value)
-                    }
-                    error={
-                      touched.stockMinimo &&
-                      (form.stockMinimo === "" ||
-                        Number(form.stockMinimo) < 0)
-                    }
-                    helperText={
-                      touched.stockMinimo &&
-                      (form.stockMinimo === "" ||
-                        Number(form.stockMinimo) < 0)
-                        ? "Ingresa un número mayor o igual a 0."
-                        : "Cantidad mínima recomendada."
-                    }
-                    disabled={isSaving}
-                    required
-                    size="small"
-                    inputProps={{ min: 0 }}
-                  />
-                </Grid>
-
-                {/* STOCK ACTUAL */}
-                <Grid item xs={12} md={3}>
-                  <TextField
-                    label="Stock actual"
-                    fullWidth
-                    type="number"
-                    inputMode="numeric"
-                    value={form.stockActual}
-                    onChange={(e) =>
-                      handleChange("stockActual", e.target.value)
-                    }
-                    helperText={
-                      initialData
-                        ? "Stock actual del modelo."
-                        : "Se iniciará automáticamente en 0."
-                    }
-                    disabled={true}
-                    size="small"
-                    inputProps={{ min: 0 }}
-                  />
-                </Grid>
-              </Grid>
-            </Box>
-
-            {/* SECCIÓN: Garantía */}
-            <Box sx={{ mb: 1 }}>
-              <Typography
-                variant="subtitle2"
-                fontWeight={600}
-                sx={{ mb: 1, mt: 1 }}
+              <FormControl
+                fullWidth
+                disabled={isSaving}
+                error={touched.color && !form.color}
+                size="small"
               >
-                Garantía
-              </Typography>
+                <InputLabel id="color-label">Color *</InputLabel>
+                <Select
+                  labelId="color-label"
+                  label="Color *"
+                  value={form.color || ""}
+                  onChange={(e) => handleChange("color", e.target.value)}
+                  sx={selectSx}
+                >
+                  <MenuItem value="">
+                    <em>Selecciona un color</em>
+                  </MenuItem>
 
-              <Grid container spacing={2}>
-                {/* DURACIÓN GARANTÍA */}
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    label="Duración de la garantía *"
-                    fullWidth
-                    type="number"
-                    inputMode="numeric"
-                    value={form.duracionGarantia}
-                    onChange={(e) =>
-                      handleChange("duracionGarantia", e.target.value)
-                    }
-                    error={
-                      touched.duracionGarantia &&
-                      (!form.duracionGarantia ||
-                        Number(form.duracionGarantia) <= 0)
-                    }
-                    helperText={
-                      touched.duracionGarantia &&
-                      (!form.duracionGarantia ||
-                        Number(form.duracionGarantia) <= 0)
-                        ? "Ingresa un número mayor a 0."
-                        : "Ejemplo: 12, 24, 36."
-                    }
-                    disabled={isSaving}
-                    required
-                    size="small"
-                    inputProps={{ min: 1 }}
-                  />
-                </Grid>
-
-                {/* TIPO GARANTÍA */}
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    label="Tipo de garantía *"
-                    value={form.tipoGarantia || ""}
-                    onChange={(e) => handleChange("tipoGarantia", e.target.value)}
-                    disabled={isSaving}
-                    error={touched.tipoGarantia && !form.tipoGarantia}
-                    helperText={
-                      touched.tipoGarantia && !form.tipoGarantia
-                        ? "Selecciona el tipo de garantía."
-                        : ""
-                    }
-                  >
-                    <MenuItem value="">
-                      <em>Selecciona el tipo</em>
+                  {COLORES.map((c) => (
+                    <MenuItem key={c} value={c}>
+                      {c}
                     </MenuItem>
-                    {TIPOS_GARANTIA.map((t) => (
-                      <MenuItem key={t.value} value={t.value}>
-                        {t.label}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
+                  ))}
+                </Select>
 
-              </Grid>
+                {touched.color && !form.color ? (
+                  <Typography variant="caption" color="error">
+                    Selecciona un color.
+                  </Typography>
+                ) : (
+                  <Typography variant="caption" sx={{ visibility: "hidden" }}>
+                    espacio
+                  </Typography>
+                )}
+              </FormControl>
             </Box>
+          </Box>
+
+          {/* SECCIÓN: Capacidad y stock */}
+          <Box sx={{ mb: 2.5 }}>
+            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.2 }}>
+              Capacidad y stock
+            </Typography>
+
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  md: "1fr 1fr 1fr 1fr",
+                },
+                gap: 1.8,
+                alignItems: "start",
+              }}
+            >
+              <TextField
+                label="Capacidad/Tamaño *"
+                placeholder="Ej: 350"
+                fullWidth
+                type="number"
+                inputMode="numeric"
+                value={form.capacidadOTamano}
+                onChange={(e) => handleChange("capacidadOTamano", e.target.value)}
+                error={
+                  touched.capacidadOTamano &&
+                  (!form.capacidadOTamano || Number(form.capacidadOTamano) <= 0)
+                }
+                helperText={
+                  touched.capacidadOTamano &&
+                  (!form.capacidadOTamano || Number(form.capacidadOTamano) <= 0)
+                    ? "Ingresa una capacidad mayor a 0."
+                    : "Ejemplo: 350, 12, 900."
+                }
+                disabled={isSaving}
+                required
+                size="small"
+                inputProps={{ min: 1 }}
+                sx={fieldSx}
+              />
+
+            <FormControl
+              fullWidth
+              disabled={isSaving}
+              error={touched.unidadMedida && !form.unidadMedida}
+              size="small"
+            >
+              <InputLabel id="unidad-label">Unidad *</InputLabel>
+
+              <Select
+                labelId="unidad-label"
+                label="Unidad *"
+                value={form.unidadMedida || ""}
+                onChange={(e) => handleChange("unidadMedida", e.target.value)}
+                sx={selectSx}
+              >
+                <MenuItem value="">
+                  <em>Selecciona unidad</em>
+                </MenuItem>
+
+                {UNIDADES.map((u) => (
+                  <MenuItem key={u} value={u}>
+                    {u}
+                  </MenuItem>
+                ))}
+              </Select>
+
+              {touched.unidadMedida && !form.unidadMedida ? (
+                <Typography variant="caption" color="error">
+                  Selecciona una unidad de medida.
+                </Typography>
+              ) : (
+                <Typography variant="caption" color="text.secondary">
+                  Ej: L, kg, BTU/h, W.
+                </Typography>
+              )}
+            </FormControl>
+
+              <TextField
+                label="Stock mínimo *"
+                fullWidth
+                type="number"
+                inputMode="numeric"
+                value={form.stockMinimo}
+                onChange={(e) => handleChange("stockMinimo", e.target.value)}
+                error={
+                  touched.stockMinimo &&
+                  (form.stockMinimo === "" || Number(form.stockMinimo) < 0)
+                }
+                helperText={
+                  touched.stockMinimo &&
+                  (form.stockMinimo === "" || Number(form.stockMinimo) < 0)
+                    ? "Ingresa un número mayor o igual a 0."
+                    : "Cantidad mínima recomendada."
+                }
+                disabled={isSaving}
+                required
+                size="small"
+                inputProps={{ min: 0 }}
+                sx={fieldSx}
+              />
+
+              <TextField
+                label="Stock actual"
+                fullWidth
+                type="number"
+                inputMode="numeric"
+                value={form.stockActual}
+                disabled
+                helperText="Se iniciará automáticamente en 0."
+                size="small"
+                inputProps={{ min: 0 }}
+                sx={fieldSx}
+              />
+            </Box>
+          </Box>
+
+          {/* SECCIÓN: Garantía */}
+          <Box sx={{ mb: 1 }}>
+            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.2 }}>
+              Garantía
+            </Typography>
+
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  md: "1fr 1fr",
+                },
+                gap: 1.8,
+                alignItems: "start",
+              }}
+            >
+              <TextField
+                label="Duración de la garantía *"
+                placeholder="Ej: 12"
+                fullWidth
+                type="number"
+                inputMode="numeric"
+                value={form.duracionGarantia}
+                onChange={(e) => handleChange("duracionGarantia", e.target.value)}
+                error={
+                  touched.duracionGarantia &&
+                  (!form.duracionGarantia || Number(form.duracionGarantia) <= 0)
+                }
+                helperText={
+                  touched.duracionGarantia &&
+                  (!form.duracionGarantia || Number(form.duracionGarantia) <= 0)
+                    ? "Ingresa un número mayor a 0."
+                    : "Ejemplo: 12, 24, 36."
+                }
+                disabled={isSaving}
+                required
+                size="small"
+                inputProps={{ min: 1 }}
+                sx={fieldSx}
+              />
+
+              <FormControl
+                fullWidth
+                disabled={isSaving}
+                error={touched.tipoGarantia && !form.tipoGarantia}
+                size="small"
+              >
+                <InputLabel id="tipo-garantia-label">Tipo de garantía *</InputLabel>
+                <Select
+                  labelId="tipo-garantia-label"
+                  label="Tipo de garantía *"
+                  value={form.tipoGarantia || ""}
+                  onChange={(e) => handleChange("tipoGarantia", e.target.value)}
+                  sx={selectSx}
+                >
+                  <MenuItem value="">
+                    <em>Selecciona el tipo</em>
+                  </MenuItem>
+
+                  {TIPOS_GARANTIA.map((t) => (
+                    <MenuItem key={t.value} value={t.value}>
+                      {t.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+
+                {touched.tipoGarantia && !form.tipoGarantia ? (
+                  <Typography variant="caption" color="error">
+                    Selecciona el tipo de garantía.
+                  </Typography>
+                ) : (
+                  <Typography variant="caption" color="text.secondary">
+                    Indica la unidad de tiempo de la garantía.
+                  </Typography>
+                )}
+              </FormControl>
+            </Box>
+          </Box>
+
 
             {errorMsg && (
               <Alert severity="error" sx={{ mt: 2 }}>

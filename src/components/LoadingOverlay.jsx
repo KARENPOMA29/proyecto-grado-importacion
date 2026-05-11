@@ -10,7 +10,7 @@ const LoadingOverlay = ({ open }) => {
           left: 0,
           width: "100vw",
           height: "100vh",
-          backgroundColor: "rgba(0,0,0,0.35)",
+          backgroundColor: "rgba(27, 2, 2, 0.35)",
           backdropFilter: "blur(2px)",
           zIndex: 9999,
           display: "flex",

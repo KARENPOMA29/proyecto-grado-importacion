@@ -83,14 +83,19 @@ const AlmacenForm = ({
       };
 
       if (initialData?.id) {
-        await ServiceAlmacen.update(initialData.id, payload);
+        const resp = await ServiceAlmacen.update(initialData.id, payload);
+
         toast.success("Almacén actualizado correctamente");
+
+        onSuccess?.(resp);
       } else {
-        await ServiceAlmacen.create(payload);
+        const resp = await ServiceAlmacen.create(payload);
+
         toast.success("Almacén creado correctamente");
+
+        onSuccess?.(resp);
       }
 
-      onSuccess?.();
       onClose?.();
       reset({ nombre: "", direccion: "", sucursalId: "" });
     } catch (err) {
@@ -118,7 +123,9 @@ const AlmacenForm = ({
     );
     onChangeRHForm(value);
   };
-
+  const getCiudadSucursal = (s) => {
+    return s?.ciudadNombre || "Sin ciudad registrada";
+  };
   return (
     <Dialog
       open={true}
@@ -240,36 +247,71 @@ const AlmacenForm = ({
 
             {/* SUCURSAL */}
             <Grid item xs={12}>
-              <FormControl
-                fullWidth
-                disabled={loading || !!sucursalContext}
-                size="small"
-              >
-                <InputLabel id="sucursal-label">Sucursal</InputLabel>
-                <Controller
-                  name="sucursalId"
-                  control={control}
-                  render={({ field }) => (
+              <Controller
+                name="sucursalId"
+                control={control}
+                rules={{
+                  required: "Debe seleccionar una sucursal",
+                }}
+                render={({ field, fieldState }) => (
+                  <FormControl
+                    fullWidth
+                    size="small"
+                    error={!!fieldState.error}
+                    disabled={loading || !!sucursalContext}
+                  >
+                    <InputLabel id="sucursal-label">
+                      Sucursal *
+                    </InputLabel>
+
                     <Select
-                      {...field}
-                      labelId="sucursal-label"
-                      label="Sucursal"
-                      MenuProps={{
-                        sx: { zIndex: 2000 },
-                      }}
-                    >
+                    {...field}
+                    labelId="sucursal-label"
+                    label="Sucursal *"
+                    renderValue={(selected) => {
+                      const sucursal = sucursales.find(
+                        (s) => Number(s.id) === Number(selected)
+                      );
+
+                      if (!sucursal) return "Seleccione una sucursal";
+
+                      return `${sucursal.nombre} - ${getCiudadSucursal(sucursal)}`;
+                    }}
+                    MenuProps={{
+                      sx: { zIndex: 2000 },
+                    }}
+                  >
                       {!sucursalContext && (
-                        <MenuItem value="">— Ninguna —</MenuItem>
+                        <MenuItem value="">
+                          <em>Seleccione una sucursal</em>
+                        </MenuItem>
                       )}
+
                       {sucursales.map((s) => (
                         <MenuItem key={s.id} value={s.id}>
-                          {s.nombre}
+                          <Box>
+                            <Typography variant="body2" fontWeight={600}>
+                              {s.nombre}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {getCiudadSucursal(s)}
+                            </Typography>
+                          </Box>
                         </MenuItem>
                       ))}
                     </Select>
-                  )}
-                />
-              </FormControl>
+
+                    <Typography
+                      variant="caption"
+                      color={fieldState.error ? "error" : "text.secondary"}
+                      sx={{ mt: 0.5, ml: 1.8 }}
+                    >
+                      {fieldState.error?.message ||
+                        "Seleccione la sucursal donde estará el almacén"}
+                    </Typography>
+                  </FormControl>
+                )}
+              />
             </Grid>
           </Grid>
 

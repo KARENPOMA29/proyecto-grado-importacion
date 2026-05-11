@@ -40,11 +40,52 @@ function getCurrentUser() {
   }
 }
 
-const getAll = async () => {
-  const { data } = await api.get(`${BASE}/`);
-  return { items: data, total: data.length };
-};
+const getAll = async (params = {}) => {
+  const {
+    search = "",
+    page = 1,
+    pageSize = 10,
+  } = params;
 
+  const { data } = await api.get(`${BASE}/`, {
+    params: {
+      search: search || undefined,
+      page,
+      pageSize,
+    },
+  });
+
+  if (Array.isArray(data)) {
+    return { items: data, total: data.length };
+  }
+
+  return {
+    items: data.items || [],
+    total: data.total || 0,
+  };
+};
+const getControl = async (params = {}) => {
+  const {
+    search = "",
+    page = 1,
+    pageSize = 10,
+    situacion = "",
+  } = params;
+
+  const { data } = await api.get(`${BASE}/control`, {
+    params: {
+      search,
+      page,
+      pageSize,
+      situacion: situacion || undefined,
+    },
+  });
+
+  return {
+    items: data.items || [],
+    total: data.total || 0,
+  };
+};
 const getById = async (id) => {
   const { data } = await api.get(`${BASE}/${id}`);
   return data;
@@ -122,5 +163,5 @@ const getByEmpleado = async (empleadoId) => {
   return Array.isArray(data) ? data : data.items || data;
 };
 
-const ServiceImportacion = { getAll, getById, create, update, remove, getByEmpleado };
+const ServiceImportacion = { getAll, getById, create, update, remove, getByEmpleado, getControl };
 export default ServiceImportacion;

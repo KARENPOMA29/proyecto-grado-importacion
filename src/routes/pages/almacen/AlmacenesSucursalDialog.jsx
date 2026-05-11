@@ -1,5 +1,5 @@
 // src/routes/pages/almacen/AlmacenesSucursalDialog.jsx
-import { useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -8,10 +8,23 @@ import {
   Button,
   Box,
   Typography,
+  TextField,
+  InputAdornment,
+  Card,
+  CardContent,
+  IconButton,
+  CircularProgress,
 } from "@mui/material";
-import { Boxes, Eye, PencilLine, Trash, LayoutList } from "lucide-react";
+import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
+import {
+  Boxes,
+  Eye,
+  PencilLine,
+  Trash,
+  LayoutList,
+  MapPin,
+} from "lucide-react";
 
-import GridGenerico from "@/components/Grid";
 import DetailsDialog from "@/components/details";
 import DeleteConfirm from "@/components/deleteConfirm";
 
@@ -20,11 +33,12 @@ import { useAuth } from "@/context/AuthContext";
 import { toast } from "react-toastify";
 import AlmacenForm from "./almacenForm";
 
-// 👇 importa el dialog de secciones
 import SeccionesAlmacenDialog from "@/routes/pages/seccion/SeccionesAlmacenDialog";
 
 const AlmacenesSucursalDialog = ({ open, sucursal, onClose }) => {
-  const gridRef = useRef(null);
+  const [almacenes, setAlmacenes] = useState([]);
+  const [search, setSearch] = useState("");
+  const [loadingAlmacenes, setLoadingAlmacenes] = useState(false);
 
   const [selectedId, setSelectedId] = useState(null);
   const [idToDelete, setIdToDelete] = useState(null);
@@ -41,31 +55,50 @@ const AlmacenesSucursalDialog = ({ open, sucursal, onClose }) => {
   const canEdit = roleKey === "administrador" || roleKey === "almacen";
   const canDelete = roleKey === "administrador";
 
-  // ⛔ si no hay sucursal seleccionada, no mostramos nada
-  if (!sucursal) return null;
+  const fetchAlmacenes = async () => {
+    if (!sucursal?.id) return;
 
-  // 🔹 servicio adaptado para GridGenerico
-  const serviceFiltrado = {
-    getAll: async () => {
-      // devuelve { items, total } igual que el resto de servicios
-      return ServiceAlmacen.getBySucursal(sucursal.id);
-    },
+    try {
+      setLoadingAlmacenes(true);
+
+      const res = await ServiceAlmacen.getBySucursal(sucursal.id, {
+        search,
+        page: 1,
+        pageSize: 50,
+      });
+
+      setAlmacenes(res.items || []);
+    } catch (error) {
+      console.error("Error cargando almacenes:", error);
+      toast.error("Error al cargar almacenes");
+    } finally {
+      setLoadingAlmacenes(false);
+    }
   };
 
-  const columns = [
-    {
-      name: "Nombre almacén",
-      selector: (r) => r.nombre,
-      sortable: true,
-      minWidth: "220px",
-    },
-    {
-      name: "Dirección",
-      selector: (r) => r.direccion || "—",
-      sortable: false,
-      minWidth: "260px",
-    },
-  ];
+  useEffect(() => {
+    if (!open) return;
+
+    setAlmacenes([]);
+    setSearch("");
+    setSelectedId(null);
+    setIdToDelete(null);
+    setShowForm(false);
+    setFormData(null);
+    setOpenSecciones(false);
+    setAlmacenSeleccionado(null);
+    setLoadingAlmacenes(true);
+  }, [sucursal?.id, open]);
+
+  useEffect(() => {
+    if (!open || !sucursal?.id) return;
+
+    const timer = setTimeout(() => {
+      fetchAlmacenes();
+    }, search ? 400 : 0);
+
+    return () => clearTimeout(timer);
+  }, [open, sucursal?.id, search]);
 
   const fields = [
     { label: "Nombre", key: "nombre" },
@@ -91,12 +124,26 @@ const AlmacenesSucursalDialog = ({ open, sucursal, onClose }) => {
     },
   ];
 
+  const handleCloseDialog = () => {
+    setAlmacenes([]);
+    setSearch("");
+    setSelectedId(null);
+    setIdToDelete(null);
+    setShowForm(false);
+    setFormData(null);
+    setOpenSecciones(false);
+    setAlmacenSeleccionado(null);
+    setLoadingAlmacenes(false);
+
+    onClose?.();
+  };
+
   const handleDelete = async () => {
     try {
       await ServiceAlmacen.remove(idToDelete);
       toast.success("Almacén eliminado correctamente");
       setIdToDelete(null);
-      gridRef.current?.refetch();
+      fetchAlmacenes();
       return Promise.resolve();
     } catch (error) {
       console.error("Error eliminando almacén:", error);
@@ -119,43 +166,65 @@ const AlmacenesSucursalDialog = ({ open, sucursal, onClose }) => {
     setShowForm(true);
   };
 
+  if (!sucursal) return null;
+
   return (
     <>
       <Dialog
         open={open}
-        onClose={onClose}
-        maxWidth="lg"
+        onClose={handleCloseDialog}
+        maxWidth="md"
         fullWidth
         PaperProps={{
           sx: {
-            borderRadius: 3,
+            borderRadius: 4,
             overflow: "hidden",
+            boxShadow: "0 18px 50px rgba(0,0,0,0.25)",
           },
         }}
       >
-        {/* HEADER con gradiente vino */}
         <DialogTitle
           sx={{
-            background: "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
-            color: "#F5F5F5",
-            py: 2,
-            px: 3,
+            background: "linear-gradient(135deg, #F8FAFC 0%, #EEF2FF 100%)",
+            color: "#1F2937",
+            py: 3,
+            px: 4,
+            borderBottom: "1px solid #E5E7EB",
           }}
         >
           <Box
             display="flex"
             alignItems="center"
-            gap={1.5}
             justifyContent="space-between"
+            gap={2}
           >
-            <Box display="flex" alignItems="center" gap={1.5}>
-              <Boxes size={22} />
+            <Box display="flex" alignItems="center" gap={2}>
+              <Box
+                sx={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: "16px",
+                  bgcolor: "#E0E7FF",
+                  color: "#592B2B",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Boxes size={28} />
+              </Box>
+
               <Box>
-                <Typography variant="h6" fontWeight={700}>
-                  Almacenes de {sucursal.nombre}
+                <Typography variant="h5" fontWeight={800}>
+                  Almacenes
                 </Typography>
-                <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                  Revisa y gestiona los almacenes registrados para esta sucursal.
+
+                <Typography variant="body1" sx={{ color: "#4B5563", mt: 0.3 }}>
+                  Sucursal: <strong>{sucursal.nombre}</strong>
+                </Typography>
+
+                <Typography variant="body2" sx={{ color: "#6B7280", mt: 0.4 }}>
+                  Organiza y administra los almacenes registrados.
                 </Typography>
               </Box>
             </Box>
@@ -167,14 +236,15 @@ const AlmacenesSucursalDialog = ({ open, sucursal, onClose }) => {
                 sx={{
                   textTransform: "none",
                   borderRadius: 999,
-                  px: 3,
-                  py: 0.8,
-                  fontWeight: 600,
+                  px: 3.5,
+                  py: 1.1,
+                  fontWeight: 700,
                   background:
-                    "linear-gradient(135deg, #14AE5C 0%, #0D8C47 100%)",
+                    "linear-gradient(135deg, #592B2B 0%, #371A1A 100%)",
+                  boxShadow: "0 8px 18px rgba(89,43,43,0.28)",
                   "&:hover": {
                     background:
-                      "linear-gradient(135deg, #0D8C47 0%, #0A6B37 100%)",
+                      "linear-gradient(135deg, #371A1A 0%, #2C1515 100%)",
                   },
                 }}
               >
@@ -186,75 +256,203 @@ const AlmacenesSucursalDialog = ({ open, sucursal, onClose }) => {
 
         <DialogContent
           sx={{
-            bgcolor: "#FAFAFA",
-            py: 3,
-            px: 3,
+            bgcolor: "#F8FAFC",
+            pt: 4,
+            pb: 3,
+            px: 4,
           }}
         >
-          <GridGenerico
-            key={sucursal.id} // 👈 para que recargue si cambias de sucursal
-            ref={gridRef}
-            service={serviceFiltrado}
-            columns={columns}
-            title={`Almacenes de ${sucursal.nombre}`}
-            pageSize={5}
-            enableSearch={true}
-            renderActions={(row) => (
-              <div className="flex gap-x-2 justify-end">
-                {/* 🔎 Ver secciones de este almacén */}
-                <button
-                  className="p-2 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors duration-200"
-                  onClick={() => {
-                    setAlmacenSeleccionado(row);
-                    setOpenSecciones(true);
+          <Box
+            sx={{
+              maxWidth: 620,
+              mx: "auto",
+              mb: 4,
+            }}
+          >
+            <TextField
+              fullWidth
+              placeholder="Buscar almacén..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              size="medium"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchOutlinedIcon sx={{ color: "#592B2B" }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 999,
+                  bgcolor: "#FFFFFF",
+                },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#CBD5E1",
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#592B2B",
+                },
+              }}
+            />
+          </Box>
+
+          {loadingAlmacenes ? (
+            <Box
+              sx={{
+                py: 5,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 2,
+              }}
+            >
+              <CircularProgress sx={{ color: "#592B2B" }} />
+              <Typography variant="body2" color="text.secondary">
+                Cargando almacenes...
+              </Typography>
+            </Box>
+          ) : almacenes.length === 0 ? (
+            <Box
+              sx={{
+                p: 4,
+                borderRadius: 3,
+                border: "1px dashed #CBD5E1",
+                bgcolor: "#FFFFFF",
+                textAlign: "center",
+              }}
+            >
+              <Typography fontWeight={700} color="#1F2937">
+                No hay almacenes registrados
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                Puedes crear un nuevo almacén para esta sucursal.
+              </Typography>
+            </Box>
+          ) : (
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  sm: "repeat(2, 1fr)",
+                  md: "repeat(3, 1fr)",
+                },
+                gap: 2.5,
+              }}
+            >
+              {almacenes.map((row) => (
+                <Card
+                  key={row.id}
+                  elevation={0}
+                  sx={{
+                    borderRadius: 3,
+                    border: "1px solid #E5E7EB",
+                    boxShadow: "0 6px 18px rgba(15,23,42,0.06)",
+                    overflow: "hidden",
+                    transition: "all 0.2s ease",
+                    "&:hover": {
+                      transform: "translateY(-3px)",
+                      boxShadow: "0 10px 28px rgba(15,23,42,0.12)",
+                    },
                   }}
-                  title="Ver secciones"
                 >
-                  <LayoutList size={16} />
-                </button>
+                  <Box
+                    sx={{
+                      height: 6,
+                      background:
+                        "linear-gradient(135deg, #592B2B 0%, #371A1A 100%)",
+                    }}
+                  />
 
-                {/* 👁 ver siempre */}
-                <button
-                  className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors duration-200"
-                  onClick={() => setSelectedId(row.id)}
-                  title="Ver detalles"
-                >
-                  <Eye size={16} />
-                </button>
+                  <CardContent sx={{ p: 2.5 }}>
+                    <Typography
+                      fontWeight={800}
+                      fontSize={17}
+                      sx={{ mb: 1, color: "#1F2937" }}
+                    >
+                      {row.nombre}
+                    </Typography>
 
-                {/* ✏️ editar: Admin + Almacen */}
-                {canEdit && (
-                  <button
-                    className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors duración-200"
-                    onClick={() => handleEdit(row.id)}
-                    title="Editar"
-                  >
-                    <PencilLine size={16} />
-                  </button>
-                )}
+                    <Box display="flex" alignItems="center" gap={1} sx={{ mb: 2 }}>
+                      <MapPin size={17} color="#592B2B" />
+                      <Typography variant="body2" color="text.secondary">
+                        {row.direccion || "Sin dirección"}
+                      </Typography>
+                    </Box>
 
-                {/* 🗑️ eliminar: solo Admin */}
-                {canDelete && (
-                  <button
-                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duración-200"
-                    onClick={() => setIdToDelete(row.id)}
-                    title="Eliminar"
-                  >
-                    <Trash size={16} />
-                  </button>
-                )}
-              </div>
-            )}
-          />
+                    <Box
+                      display="flex"
+                      justifyContent="flex-end"
+                      alignItems="center"
+                      gap={1}
+                    >
+                      <IconButton
+                        onClick={() => {
+                          setAlmacenSeleccionado(row);
+                          setOpenSecciones(true);
+                        }}
+                        title="Ver secciones"
+                        sx={{
+                          bgcolor: "#F7F3FF",
+                          "&:hover": { bgcolor: "#EEE6FF" },
+                        }}
+                      >
+                        <LayoutList size={18} color="#6D28D9" />
+                      </IconButton>
+
+                      <IconButton
+                        onClick={() => setSelectedId(row.id)}
+                        title="Ver detalles"
+                        sx={{
+                          bgcolor: "#EEF6FF",
+                          "&:hover": { bgcolor: "#DDEEFF" },
+                        }}
+                      >
+                        <Eye size={18} color="#2563EB" />
+                      </IconButton>
+
+                      {canEdit && (
+                        <IconButton
+                          onClick={() => handleEdit(row.id)}
+                          title="Editar"
+                          sx={{
+                            bgcolor: "#ECFDF3",
+                            "&:hover": { bgcolor: "#D1FAE5" },
+                          }}
+                        >
+                          <PencilLine size={18} color="#0D8C47" />
+                        </IconButton>
+                      )}
+
+                      {canDelete && (
+                        <IconButton
+                          onClick={() => setIdToDelete(row.id)}
+                          title="Eliminar"
+                          sx={{
+                            bgcolor: "#FEF2F2",
+                            "&:hover": { bgcolor: "#FEE2E2" },
+                          }}
+                        >
+                          <Trash size={18} color="#D32F2F" />
+                        </IconButton>
+                      )}
+                    </Box>
+                  </CardContent>
+                </Card>
+              ))}
+            </Box>
+          )}
         </DialogContent>
 
-        <DialogActions sx={{ px: 3, py: 2 }}>
+        <DialogActions sx={{ px: 4, py: 2.5, bgcolor: "#FFFFFF" }}>
           <Button
-            onClick={onClose}
+            onClick={handleCloseDialog}
             variant="outlined"
             sx={{
               textTransform: "none",
               borderRadius: 999,
+              px: 3,
             }}
           >
             Cerrar
@@ -262,7 +460,6 @@ const AlmacenesSucursalDialog = ({ open, sucursal, onClose }) => {
         </DialogActions>
       </Dialog>
 
-      {/* Detalles del almacén */}
       <DetailsDialog
         open={!!selectedId}
         id={selectedId}
@@ -271,7 +468,6 @@ const AlmacenesSucursalDialog = ({ open, sucursal, onClose }) => {
         onClose={() => setSelectedId(null)}
       />
 
-      {/* Confirm eliminar */}
       {idToDelete && canDelete && (
         <DeleteConfirm
           title="¿Eliminar almacén?"
@@ -281,21 +477,19 @@ const AlmacenesSucursalDialog = ({ open, sucursal, onClose }) => {
         />
       )}
 
-      {/* Form (crear / editar) */}
       {showForm && (
         <AlmacenForm
           onClose={() => setShowForm(false)}
           onSuccess={() => {
-            gridRef.current?.refetch();
+            fetchAlmacenes();
             setShowForm(false);
           }}
           initialData={formData}
-          sucursales={[sucursal]}      // 👈 solo esta sucursal
-          sucursalContext={sucursal}   // 👈 para que el combo venga preseleccionado
+          sucursales={[sucursal]}
+          sucursalContext={sucursal}
         />
       )}
 
-      {/* Dialog de secciones del almacén seleccionado */}
       <SeccionesAlmacenDialog
         open={openSecciones}
         almacen={almacenSeleccionado}
