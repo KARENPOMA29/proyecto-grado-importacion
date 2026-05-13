@@ -1,626 +1,462 @@
-import { useState, useEffect, useRef } from "react";
-import { 
-  Eye, 
-  PencilLine,
-  Package,
-  Tag,
-  BarChart3,
-  Check,
-  AlertCircle,
-  Filter,
-  Search
-} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Box,
   Card,
+  Chip,
+  CircularProgress,
+  FormControl,
+  Grid,
+  InputAdornment,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TablePagination,
+  TableRow,
+  TextField,
+  Tooltip,
   Typography,
   Button,
-  Chip,
-  IconButton,
-  Tooltip,
-  TextField,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Select
 } from "@mui/material";
-import GridGenerico from "@/components/Grid";
-import DetailsDialog from "@/components/details";
-import ProductoForm from "./ProductoForm";
-import ServiceProducto from "@/services/ServiceProducto";
-import ServiceModeloProducto from "@/services/ServiceModeloProducto";
-import ServiceCategoria from "@/services/ServiceCategoria";
-import ServiceImportacion from "@/services/ServiceImportacion";
-import { toast } from "react-toastify";
-import { useAuth } from "@/context/AuthContext";
-import BarcodeListener from "@/components/BarcodeListener";
-const ProductList = () => {
-  const [selectedId, setSelectedId] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState(null);
+import {
+  AlertCircle,
+  Check,
+  Filter,
+  MapPin,
+  Package,
+  Search,
+  Warehouse,
+  X,
+} from "lucide-react";
 
-  const [modelos, setModelos] = useState([]);
-  const [categorias, setCategorias] = useState([]);
-  const [importaciones, setImportaciones] = useState([]);
-  
+import { toast } from "react-toastify";
+import BarcodeListener from "@/components/BarcodeListener";
+
+import ServiceProducto from "@/services/ServiceProducto";
+import ServiceCategoria from "@/services/ServiceCategoria";
+import ServiceModeloProducto from "@/services/ServiceModeloProducto";
+import ServiceImportacion from "@/services/ServiceImportacion";
+
+const ProductList = () => {
+  const searchRef = useRef(null);
+
+  const [search, setSearch] = useState("");
+
   const [filters, setFilters] = useState({
+    estado: 1,
     observado: "",
     categoriaId: "",
     modeloId: "",
     importacionId: "",
-    numeroSerie: "",
   });
-  const [totalProductos, setTotalProductos] = useState(0);
-  const gridRef = useRef(null);
-  const [reloadKey, setReloadKey] = useState(0);
-  const serieFilterRef = useRef(null);
-  // 👇 permisos por rol
-  const { user } = useAuth();
-  const roleKey = (user?.rol || "").trim().toLowerCase();
-  const canCreate = roleKey === "administrador" || roleKey === "almacen";
-  const canEdit = roleKey === "administrador" || roleKey === "almacen";
-  const canDelete = roleKey === "administrador";
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const data = await ServiceModeloProducto.getAll();
-        setModelos(Array.isArray(data) ? data : data?.items || []);
-      } catch {
-        setModelos([]);
-      }
+  const [categorias, setCategorias] = useState([]);
+  const [modelos, setModelos] = useState([]);
+  const [importaciones, setImportaciones] = useState([]);
 
-      try {
-        const data = await ServiceCategoria.getAll();
-        setCategorias(Array.isArray(data) ? data : data?.items || []);
-      } catch {
-        setCategorias([]);
-      }
+  const [rows, setRows] = useState([]);
+  const [total, setTotal] = useState(0);
 
-      try {
-        const data = await ServiceImportacion.getAll();
-        setImportaciones(Array.isArray(data) ? data : data?.items || []);
-      } catch {
-        setImportaciones([]);
-      }
-    })();
-  }, []);
-  // 🔢 Recalcular total de productos según los filtros actuales
-  useEffect(() => {
-    (async () => {
-      try {
-        const data = await serviceWithFilters.getAll();
-        setTotalProductos(Array.isArray(data) ? data.length : 0);
-      } catch {
-        setTotalProductos(0);
-      }
-    })();
-  }, [filters, reloadKey]);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
 
-  const getModeloNombre = (id) => {
-    const found = modelos.find((x) => x.id === id);
-    return found ? found.nombreModelo : `#${id}`;
-  };
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const getCategoriaNombre = (id) => {
-    const found = categorias.find((x) => x.id === id);
-    return found ? found.nombre || found.nombreCategoria : `#${id}`;
-  };
-
-  const getImportacionCodigo = (id) => {
-    const found = importaciones.find((x) => x.id === id);
-    return found ? found.codigo || found.codigoImportacion : `#${id}`;
-  };
-
-  // 🟢 abrir formulario para editar
-  const handleEdit = async (id) => {
+  const cargarCombos = async () => {
     try {
-      const data = await ServiceProducto.getById(id);
-      setFormData(data);
-      setShowForm(true);
-    } catch {
-      toast.error("Error al cargar producto para editar");
+      const params = { page: 1, pageSize: 1000 };
+
+      const [catRes, modRes, impRes] = await Promise.allSettled([
+        ServiceCategoria.getAll(params),
+        ServiceModeloProducto.getAll(params),
+        ServiceImportacion.getAll(params),
+      ]);
+
+      if (catRes.status === "fulfilled") {
+        const data = catRes.value;
+        setCategorias(Array.isArray(data) ? data : data?.items || []);
+      }
+
+      if (modRes.status === "fulfilled") {
+        const data = modRes.value;
+        setModelos(Array.isArray(data) ? data : data?.items || []);
+      }
+
+      if (impRes.status === "fulfilled") {
+        const data = impRes.value;
+        setImportaciones(Array.isArray(data) ? data : data?.items || []);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al cargar filtros");
     }
   };
-  const handleBarcodeScanFilter = (code) => {
-    setFilters((prev) => ({
-      ...prev,
-      numeroSerie: code,
-    }));
-    setReloadKey((prev) => prev + 1); // fuerza recarga del grid
 
-    if (serieFilterRef.current) {
-      serieFilterRef.current.focus();
-      serieFilterRef.current.select?.();
+  const buildParams = () => {
+    const params = {
+      page: page + 1,
+      pageSize,
+    };
+
+    if (search.trim()) params.search = search.trim();
+
+    if (filters.estado !== "" && filters.estado !== null && filters.estado !== undefined) {
+      params.estado = Number(filters.estado);
     }
 
-    toast.success(`Código escaneado: ${code}`);
-  };
-  // 🟢 cuando el formulario guarda OK
-  const handleFormSuccess = () => {
-    setShowForm(false);
-    setFormData(null);
-    setReloadKey((prev) => prev + 1);
-  };
+    if (filters.observado !== "") params.observado = Number(filters.observado);
+    if (filters.categoriaId !== "") params.categoriaId = Number(filters.categoriaId);
+    if (filters.modeloId !== "") params.modeloId = Number(filters.modeloId);
+    if (filters.importacionId !== "") params.importacionId = Number(filters.importacionId);
 
-  // 🟢 Servicio que pasa filtros al backend (query params)
-  const serviceWithFilters = {
-    ...ServiceProducto,
-    getAll: async (params = {}) => {
-      const filterParams = {};
-
-      if (filters.observado) filterParams.observado = filters.observado;
-      if (filters.categoriaId) filterParams.categoriaId = filters.categoriaId;
-      if (filters.modeloId) filterParams.modeloId = filters.modeloId;
-      if (filters.importacionId)
-        filterParams.importacionId = filters.importacionId;
-      if (filters.numeroSerie?.trim())
-        filterParams.numeroSerie = filters.numeroSerie.trim();
-
-      return ServiceProducto.getAll({
-        ...params,
-        ...filterParams,
-      });
-    },
+    return params;
   };
 
-  const columns = [
-    { 
-      name: "N° Serie", 
-      selector: (row) => row.numeroSerie, 
-      sortable: true,
-      width: "140px"
-    },
-    { 
-      name: "Descripción", 
-      selector: (row) => row.descripcion, 
-      sortable: true,
-      wrap: true,
-      minWidth: "200px"
-    },
-    {
-      name: "Precio (Bs)",
-      selector: (row) => Number(row.precio || 0).toFixed(2),
-      sortable: true,
-      right: true,
-      width: "120px"
-    },
-    {
-      name: "Categoría",
-      selector: (row) => getCategoriaNombre(row.categoriaId),
-      sortable: true,
-      width: "150px"
-    },
-    {
-      name: "Modelo",
-      selector: (row) => getModeloNombre(row.modeloId),
-      sortable: true,
-      width: "150px"
-    },
-    {
-      name: "Importación",
-      selector: (row) => getImportacionCodigo(row.importacionId),
-      sortable: true,
-      width: "120px"
-    },
-    {
-      name: "Observación",
-      cell: (row) => {
-        const tieneObsDescripcion =
-          row.obsDescripcion && row.obsDescripcion.trim() !== "";
-        
-        if (row.observado === 2 || tieneObsDescripcion) {
-          return (
-            <Tooltip title={tieneObsDescripcion ? row.obsDescripcion : "Producto observado"}>
-              <Chip
-                icon={<AlertCircle size={14} />}
-                label="Observado"
-                size="small"
-                sx={{
-                  bgcolor: "#FFF3CD",
-                  color: "#856404",
-                  fontWeight: 600,
-                  fontSize: "0.75rem",
-                  height: "24px",
-                  "& .MuiChip-icon": {
-                    color: "#856404",
-                    marginLeft: "4px"
-                  }
-                }}
-              />
-            </Tooltip>
-          );
-        }
+  const cargarProductos = async () => {
+    try {
+      setLoading(true);
+      setErrorMsg("");
 
-        if (row.observado === 1) {
-          return (
-            <Chip
-              icon={<Check size={14} />}
-              label="Normal"
-              size="small"
-              sx={{
-                bgcolor: "#D1E7DD",
-                color: "#0F5132",
-                fontWeight: 500,
-                fontSize: "0.75rem",
-                height: "24px",
-                "& .MuiChip-icon": {
-                  color: "#0F5132",
-                  marginLeft: "4px"
-                }
-              }}
-            />
-          );
-        }
+      const res = await ServiceProducto.buscar(buildParams());
 
-        return (
-          <Chip
-            label="—"
-            size="small"
-            sx={{
-              bgcolor: "#F8F9FA",
-              color: "#6C757D",
-              fontSize: "0.75rem",
-              height: "24px"
-            }}
-          />
-        );
-      },
-      center: true,
-      width: "130px"
-    },
-    {
-      name: "Estado",
-      cell: (row) => {
-        const estado = row.estado;
-        let color, bgcolor, label;
-        
-        switch(estado) {
-          case 1:
-            color = "#0D8C47";
-            bgcolor = "#0D8C4720";
-            label = "Disponible";
-            break;
-          case 2:
-            color = "#592B2B";
-            bgcolor = "#592B2B20";
-            label = "Vendido";
-            break;
-          default:
-            color = "#6C757D";
-            bgcolor = "#F8F9FA";
-            label = "Inactivo";
-        }
-        
-        return (
-          <Chip
-            label={label}
-            size="small"
-            sx={{
-              bgcolor,
-              color,
-              fontWeight: 600,
-              fontSize: "0.75rem",
-              height: "24px"
-            }}
-          />
-        );
-      },
-      sortable: true,
-      width: "120px"
-    },
-    {
-      name: "Acciones",
-      cell: (row) => (
-        <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
-          <Tooltip title="Ver detalles">
-            <IconButton
-              size="small"
-              onClick={() => setSelectedId(row.id)}
-              sx={{
-                color: "#592B2B",
-                "&:hover": {
-                  bgcolor: "#592B2B10"
-                }
-              }}
-            >
-              <Eye size={18} />
-            </IconButton>
-          </Tooltip>
+      setRows(res?.items || []);
+      setTotal(res?.total || 0);
+    } catch (error) {
+      console.error(error);
+      setRows([]);
+      setTotal(0);
+      setErrorMsg(error.message || "Error al buscar productos");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-          {canEdit && (
-            <Tooltip title="Editar">
-              <IconButton
-                size="small"
-                onClick={() => handleEdit(row.id)}
-                sx={{
-                  color: "#0D8C47",
-                  "&:hover": {
-                    bgcolor: "#0D8C4710"
-                  }
-                }}
-              >
-                <PencilLine size={18} />
-              </IconButton>
-            </Tooltip>
-          )}
-        </Box>
-      ),
-      width: "100px",
-      right: true
-    },
-  ];
+  useEffect(() => {
+    cargarCombos();
+  }, []);
 
-  const detailFields = [
-    { key: "numeroSerie", label: "Número de Serie" },
-    { key: "descripcion", label: "Descripción" },
-    { 
-      key: "precio", 
-      label: "Precio", 
-      format: (v) => `Bs ${Number(v || 0).toFixed(2)}` 
-    },
-    { 
-      key: "precioOrigen", 
-      label: "Precio Origen", 
-      format: (v) => `Bs ${Number(v || 0).toFixed(2)}` 
-    },
-    { key: "categoriaId", label: "Categoría", format: getCategoriaNombre },
-    { key: "modeloId", label: "Modelo", format: getModeloNombre },
-    { key: "importacionId", label: "Importación", format: getImportacionCodigo },
-    {
-      key: "observado",
-      label: "Observado",
-      format: (v) => v === 1 ? "No" : v === 2 ? "Sí" : "—"
-    },
-    {
-      key: "obsDescripcion",
-      label: "Detalle observación",
-      format: (v) => v || "Sin detalles"
-    },
-    {
-      key: "estado",
-      label: "Estado",
-      format: (v) => v === 1 ? "Disponible" : v === 2 ? "Vendido" : "Inactivo"
-    },
-    {
-      key: "fechaRegistro",
-      label: "Fecha de Registro",
-      format: (v) => v ? new Date(v).toLocaleString("es-ES") : "—"
-    },
-  ];
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      cargarProductos();
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [search, filters, page, pageSize]);
 
   const handleFilterChange = (field, value) => {
-    setFilters((prev) => ({ ...prev, [field]: value }));
-    setReloadKey((prev) => prev + 1);  // fuerza recarga del grid
+    setFilters((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+    setPage(0);
   };
 
   const clearFilters = () => {
+    setSearch("");
     setFilters({
+      estado: 1,
       observado: "",
       categoriaId: "",
       modeloId: "",
       importacionId: "",
-      numeroSerie: "",
     });
-    setReloadKey((prev) => prev + 1);
+    setPage(0);
+    searchRef.current?.focus();
+  };
+
+  const handleBarcodeScan = (code) => {
+    setSearch(code);
+    setPage(0);
+    searchRef.current?.focus();
+    searchRef.current?.select?.();
+    toast.success(`Código escaneado: ${code}`);
+  };
+
+  const estadoChip = (estado) => {
+    if (estado === 1) {
+      return (
+        <Chip
+          label="Disponible"
+          size="small"
+          sx={{
+            bgcolor: "#0D8C4720",
+            color: "#0D8C47",
+            fontWeight: 700,
+          }}
+        />
+      );
+    }
+
+    if (estado === 2) {
+      return (
+        <Chip
+          label="Vendido"
+          size="small"
+          sx={{
+            bgcolor: "#592B2B20",
+            color: "#592B2B",
+            fontWeight: 700,
+          }}
+        />
+      );
+    }
+
+    return (
+      <Chip
+        label="Inactivo"
+        size="small"
+        sx={{
+          bgcolor: "#F1F5F9",
+          color: "#64748B",
+          fontWeight: 700,
+        }}
+      />
+    );
+  };
+
+  const observadoChip = (row) => {
+    const tieneObs = row.obsDescripcion && row.obsDescripcion.trim() !== "";
+
+    if (row.observado === 2 || tieneObs) {
+      return (
+        <Tooltip title={row.obsDescripcion || "Producto observado"}>
+          <Chip
+            icon={<AlertCircle size={14} />}
+            label="Observado"
+            size="small"
+            sx={{
+              bgcolor: "#FFF3CD",
+              color: "#856404",
+              fontWeight: 700,
+              "& .MuiChip-icon": { color: "#856404" },
+            }}
+          />
+        </Tooltip>
+      );
+    }
+
+    return (
+      <Chip
+        icon={<Check size={14} />}
+        label="Normal"
+        size="small"
+        sx={{
+          bgcolor: "#D1E7DD",
+          color: "#0F5132",
+          fontWeight: 700,
+          "& .MuiChip-icon": { color: "#0F5132" },
+        }}
+      />
+    );
   };
 
   return (
     <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
-       {/* 🔹 LECTOR DE CÓDIGO DE BARRAS PARA EL FILTRO DE SERIE */}
-        <BarcodeListener
-          onScan={handleBarcodeScanFilter}
-          enabled
-          debug
-          targetRef={serieFilterRef}
-          gapMs={120}
-          autoLength={13}
-        />
-      {/* HEADER */}
-      <Box sx={{ mb: 4 }}>
-        <Box sx={{ 
-          display: "flex", 
-          flexDirection: { xs: "column", md: "row" }, 
-          alignItems: { xs: "flex-start", md: "center" },
-          justifyContent: "space-between",
-          gap: 2,
-          mb: 3
-        }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Box sx={{ 
-              width: 48, 
-              height: 48, 
-              borderRadius: "50%", 
-              bgcolor: "#592B2B20", 
-              display: "flex", 
-              alignItems: "center", 
-              justifyContent: "center" 
-            }}>
-              <Package size={24} color="#592B2B" />
-            </Box>
-            <Box>
-              <Typography variant="h4" sx={{ fontWeight: 700, color: "#3A1A1A" }}>
-                Gestión de Productos
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Administra el inventario de productos disponibles
-              </Typography>
-            </Box>
+      <BarcodeListener
+        onScan={handleBarcodeScan}
+        enabled
+        targetRef={searchRef}
+        gapMs={120}
+        autoLength={13}
+      />
+
+      <Box sx={{ mb: 3 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: "50%",
+              bgcolor: "#592B2B20",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Package size={24} color="#592B2B" />
           </Box>
 
-          {canCreate && (
-            <Button
-              variant="contained"
-              onClick={() => {
-                setFormData(null);
-                setShowForm(true);
-              }}
-              startIcon={<PencilLine size={18} />}
-              sx={{
-                borderRadius: 2,
-                px: 3,
-                py: 1,
-                fontWeight: 600,
-                textTransform: "none",
-                background: "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
-                boxShadow: "0 4px 10px rgba(89,43,43,0.25)",
-                "&:hover": {
-                  background: "linear-gradient(135deg, #3A1A1A 0%, #592B2B 100%)",
-                  boxShadow: "0 6px 16px rgba(89,43,43,0.35)",
-                },
-              }}
-            >
-              Nuevo Producto
-            </Button>
-          )}
-        </Box>
-
-        {/* FILTROS */}
-        <Card 
-          variant="outlined" 
-          sx={{ 
-            p: 2, 
-            mb: 3, 
-            borderRadius: 3, 
-            borderColor: "#f1d2d2", 
-            bgcolor: "#fdf5f5" 
-          }}
-        >
-          <Box sx={{ 
-            display: "flex", 
-            alignItems: "center", 
-            gap: 1, 
-            mb: 2 
-          }}>
-            <Filter size={18} color="#592B2B" />
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "#3A1A1A" }}>
-              Filtros
+          <Box>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: "#3A1A1A" }}>
+              Buscador de Productos
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Busca productos por serie, modelo, categoría, importación, ciudad,
+              sucursal, almacén o sección.
             </Typography>
           </Box>
-          
-          <Box sx={{ 
-            display: "flex", 
-            flexDirection: { xs: "column", sm: "row" },
-            gap: 2,
-            alignItems: { xs: "stretch", sm: "center" },
-            flexWrap: "wrap"
-          }}>
-            {/* Buscador por serie */}
+        </Box>
+      </Box>
+
+      <Card
+        variant="outlined"
+        sx={{
+          p: 2,
+          mb: 3,
+          borderRadius: 3,
+          borderColor: "#f1d2d2",
+          bgcolor: "#fdf5f5",
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+          <Filter size={18} color="#592B2B" />
+          <Typography sx={{ fontWeight: 700, color: "#3A1A1A" }}>
+            Búsqueda y filtros
+          </Typography>
+        </Box>
+
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} md={4}>
             <TextField
+              fullWidth
               size="small"
-              label="Buscar por N° de Serie"
-              value={filters.numeroSerie}
-              inputRef={serieFilterRef}       // 👈 AQUÍ
-              onChange={(e) => handleFilterChange("numeroSerie", e.target.value)}
+              inputRef={searchRef}
+              label="Buscar producto"
+              placeholder="Serie, modelo, categoría, ciudad, sucursal, almacén..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(0);
+              }}
               InputProps={{
                 startAdornment: (
-                  <Search size={16} style={{ marginRight: 6, color: "#6b7280" }} />
+                  <InputAdornment position="start">
+                    <Search size={18} color="#6b7280" />
+                  </InputAdornment>
                 ),
               }}
               sx={{
-                minWidth: 220,
                 "& .MuiOutlinedInput-root": {
-                  borderRadius: "8px",
+                  borderRadius: 2,
                   bgcolor: "white",
                 },
               }}
             />
+          </Grid>
 
-            <FormControl size="small" sx={{ minWidth: 120 }}>
-              <InputLabel>Observado</InputLabel>
+          <Grid item xs={12} sm={6} md={2}>
+           <FormControl fullWidth size="small">
+              <InputLabel>Estado</InputLabel>
+              <Select
+                value={filters.estado}
+                label="Estado"
+                onChange={(e) => handleFilterChange("estado", e.target.value)}
+                sx={{
+                  borderRadius: 2,
+                  bgcolor: "white",
+                  minWidth: 160,
+                  "& .MuiSelect-select": {
+                    fontWeight: 600,
+                  },
+                }}
+              >
+                <MenuItem value="">Todos los estados</MenuItem>
+                <MenuItem value={1}>Disponibles</MenuItem>
+                <MenuItem value={2}>Vendidos</MenuItem>
+                <MenuItem value={0}>Inactivos</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={2}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Observación</InputLabel>
               <Select
                 value={filters.observado}
-                label="Observado"
+                label="Observación"
                 onChange={(e) => handleFilterChange("observado", e.target.value)}
                 sx={{
-                  borderRadius: "8px",
+                  borderRadius: 2,
                   bgcolor: "white",
-                  "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#e2e8f0",
+                  minWidth: 160,
+                  "& .MuiSelect-select": {
+                    fontWeight: 600,
                   },
-                  "&:hover .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#a66",
-                  }
                 }}
               >
                 <MenuItem value="">Todos</MenuItem>
-                <MenuItem value="1">Normal</MenuItem>
-                <MenuItem value="2">Observado</MenuItem>
+                <MenuItem value={1}>Normal</MenuItem>
+                <MenuItem value={2}>Observado</MenuItem>
               </Select>
             </FormControl>
+          </Grid>
 
-            <FormControl size="small" sx={{ minWidth: 140 }}>
+          <Grid item xs={12} sm={6} md={2}>
+            <FormControl fullWidth size="small">
               <InputLabel>Categoría</InputLabel>
               <Select
                 value={filters.categoriaId}
                 label="Categoría"
                 onChange={(e) => handleFilterChange("categoriaId", e.target.value)}
                 sx={{
-                  borderRadius: "8px",
+                  borderRadius: 2,
                   bgcolor: "white",
-                  "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#e2e8f0",
+                  minWidth: 180,
+                  "& .MuiSelect-select": {
+                    fontWeight: 600,
                   },
-                  "&:hover .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#a66",
-                  }
                 }}
               >
-                <MenuItem value="">Todas</MenuItem>
-                {categorias.map(cat => (
+                <MenuItem value="">Todas las categorías</MenuItem>
+                {categorias.map((cat) => (
                   <MenuItem key={cat.id} value={cat.id}>
                     {cat.nombre || cat.nombreCategoria}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
+          </Grid>
 
-            <FormControl size="small" sx={{ minWidth: 140 }}>
+          <Grid item xs={12} sm={6} md={2}>
+            <FormControl fullWidth size="small">
               <InputLabel>Modelo</InputLabel>
               <Select
                 value={filters.modeloId}
                 label="Modelo"
                 onChange={(e) => handleFilterChange("modeloId", e.target.value)}
                 sx={{
-                  borderRadius: "8px",
+                  borderRadius: 2,
                   bgcolor: "white",
-                  "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#e2e8f0",
+                  minWidth: 180,
+                  "& .MuiSelect-select": {
+                    fontWeight: 600,
                   },
-                  "&:hover .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#a66",
-                  }
                 }}
               >
-                <MenuItem value="">Todos</MenuItem>
-                {modelos.map(mod => (
+                <MenuItem value="">Todos los modelos</MenuItem>
+                {modelos.map((mod) => (
                   <MenuItem key={mod.id} value={mod.id}>
                     {mod.nombreModelo || mod.nombre}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
+          </Grid>
 
-            <FormControl size="small" sx={{ minWidth: 160 }}>
+          <Grid item xs={12} sm={6} md={2}>
+            <FormControl fullWidth size="small">
               <InputLabel>Importación</InputLabel>
               <Select
                 value={filters.importacionId}
                 label="Importación"
-                onChange={(e) =>
-                  handleFilterChange("importacionId", e.target.value)
-                }
+                onChange={(e) => handleFilterChange("importacionId", e.target.value)}
                 sx={{
-                  borderRadius: "8px",
+                  borderRadius: 2,
                   bgcolor: "white",
-                  "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#e2e8f0",
+                  minWidth: 180,
+                  "& .MuiSelect-select": {
+                    fontWeight: 600,
                   },
-                  "&:hover .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#a66",
-                  }
                 }}
               >
-                <MenuItem value="">Todas</MenuItem>
+                <MenuItem value="">Todas las importaciones</MenuItem>
                 {importaciones.map((imp) => (
                   <MenuItem key={imp.id} value={imp.id}>
                     {imp.codigo || imp.codigoImportacion}
@@ -628,103 +464,191 @@ const ProductList = () => {
                 ))}
               </Select>
             </FormControl>
+          </Grid>
 
+          <Grid item xs={12} sm={6} md={2}>
             <Button
+              fullWidth
               variant="outlined"
+              startIcon={<X size={16} />}
               onClick={clearFilters}
-              size="small"
               sx={{
-                borderRadius: "8px",
+                height: 40,
+                borderRadius: 2,
                 borderColor: "#592B2B",
                 color: "#592B2B",
                 textTransform: "none",
-                fontWeight: 500,
+                fontWeight: 700,
+                bgcolor: "white",
                 "&:hover": {
                   borderColor: "#3A1A1A",
-                  bgcolor: "#592B2B08"
-                }
+                  bgcolor: "#592B2B08",
+                },
               }}
             >
               Limpiar filtros
             </Button>
+          </Grid>
+        </Grid>
+      </Card>
+
+      <Card
+        variant="outlined"
+        sx={{
+          mb: 3,
+          p: 2,
+          borderRadius: 3,
+          borderColor: "#f1d2d2",
+          bgcolor: "white",
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Box
+            sx={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              bgcolor: "#0D8C4720",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Package size={20} color="#0D8C47" />
           </Box>
-        </Card>
-      </Box>
 
-      {/* RESUMEN ESTADÍSTICO (lo puedes ajustar más adelante si quieres) */}
-      <Card 
-        variant="outlined" 
-        sx={{ 
-          mb: 3, 
-          p: 2, 
-          borderRadius: 3, 
-          borderColor: "#f1d2d2",
-          bgcolor: "white"
-        }}
-      >
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2, flex: 1 }}>
-        <Box sx={{ 
-          width: 40, 
-          height: 40, 
-          borderRadius: "50%", 
-          bgcolor: "#0D8C4720", 
-          display: "flex", 
-          alignItems: "center", 
-          justifyContent: "center" 
-        }}>
-          <Package size={20} color="#0D8C47" />
+          <Box>
+            <Typography variant="caption" color="text.secondary">
+              Total productos encontrados
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: "#0D8C47" }}>
+              {total}
+            </Typography>
+          </Box>
         </Box>
-        <Box>
-          <Typography variant="caption" color="text.secondary">
-            Total productos (según filtros)
-          </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0D8C47" }}>
-            {totalProductos} encontrados
-          </Typography>
-        </Box>
-      </Box>
-
-
       </Card>
 
-      {/* TABLA DE PRODUCTOS */}
-      <Card 
-        variant="outlined" 
-        sx={{ 
-          borderRadius: 3, 
-          borderColor: "#f1d2d2",
-          overflow: "hidden"
-        }}
-      >
-            <GridGenerico
-              key={reloadKey}
-              ref={gridRef}
-              title=""
-              service={serviceWithFilters}
-              enableSearch={false} 
-              columns={columns}
-              pageSize={10}
-              defaultSortField="fechaRegistro"
-              defaultSortAsc={false}
-            />
-      </Card>
-
-      {/* MODALES */}
-      {showForm && (
-        <ProductoForm
-          initialData={formData}
-          onClose={() => setShowForm(false)}
-          onSuccess={handleFormSuccess}
-        />
+      {errorMsg && (
+        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+          {errorMsg}
+        </Alert>
       )}
 
-      <DetailsDialog
-        open={Boolean(selectedId)}
-        id={selectedId}
-        fields={detailFields}
-        fetchData={ServiceProducto.getById}
-        onClose={() => setSelectedId(null)}
-      />
+      <Card
+        variant="outlined"
+        sx={{
+          borderRadius: 3,
+          borderColor: "#f1d2d2",
+          overflow: "hidden",
+        }}
+      >
+        <TableContainer component={Paper} elevation={0} sx={{ maxHeight: 640 }}>
+          <Table stickyHeader size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>N° Serie</TableCell>
+                <TableCell>Producto</TableCell>
+                <TableCell>Categoría</TableCell>
+                <TableCell>Modelo</TableCell>
+                <TableCell>Ubicación</TableCell>
+                <TableCell>Observación</TableCell>
+                <TableCell>Estado</TableCell>
+                <TableCell align="right">Precio</TableCell>
+              </TableRow>
+            </TableHead>
+
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                    <CircularProgress size={30} />
+                  </TableCell>
+                </TableRow>
+              ) : rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                    No se encontraron productos.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                rows.map((row) => (
+                  <TableRow key={row.productoId} hover>
+                    <TableCell sx={{ fontWeight: 700 }}>
+                      {row.numeroSerie || "—"}
+                    </TableCell>
+
+                    <TableCell>
+                      <Typography sx={{ fontWeight: 600 }}>
+                        {row.descripcion || "Sin descripción"}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Importación: {row.importacionCodigo || "—"}
+                      </Typography>
+                    </TableCell>
+
+                    <TableCell>{row.categoriaNombre || "—"}</TableCell>
+
+                    <TableCell>
+                      <Typography sx={{ fontWeight: 600 }}>
+                        {row.nombreModelo || "—"}
+                      </Typography>
+                      
+                    </TableCell>
+
+                    <TableCell>
+                      <Box sx={{ display: "flex", flexDirection: "column", gap: 0.4 }}>
+                        <Typography
+                          variant="body2"
+                          sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                        >
+                          <MapPin size={14} />
+                          {row.ciudadNombre || "Sin ciudad"} /{" "}
+                          {row.sucursalNombre || "Sin sucursal"}
+                        </Typography>
+
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                        >
+                          <Warehouse size={13} />
+                          {row.almacenNombre || "Sin almacén"} /{" "}
+                          {row.seccionNombre || "Sin sección"}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+
+                    <TableCell>{observadoChip(row)}</TableCell>
+
+                    <TableCell>{estadoChip(row.productoEstado)}</TableCell>
+
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>
+                      Bs {Number(row.precio || 0).toFixed(2)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        <TablePagination
+          component="div"
+          count={total}
+          page={page}
+          rowsPerPage={pageSize}
+          rowsPerPageOptions={[10, 20, 50, 100]}
+          labelRowsPerPage="Filas por página"
+          labelDisplayedRows={({ from, to, count }) =>
+            `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`
+          }
+          onPageChange={(_, newPage) => setPage(newPage)}
+          onRowsPerPageChange={(e) => {
+            setPageSize(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+        />
+      </Card>
     </Box>
   );
 };

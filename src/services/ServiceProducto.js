@@ -39,6 +39,19 @@ const getDisponiblesPorSucursal = async (sucursalId) => {
   const { data } = await api.get(`/productos/disponibles/sucursal/${sucursalId}`);
   return Array.isArray(data) ? data : data.items || [];
 };
+const buscar = async (params = {}) => {
+  try {
+    const res = await api.get(`${BASE}/buscador`, { params });
+    return res.data;
+  } catch (err) {
+    const message =
+      err.response?.data?.detail ||
+      err.message ||
+      "Error al buscar productos";
+
+    throw new Error(message);
+  }
+};
 const ServiceProducto = {
   create,
   getAll,
@@ -47,7 +60,8 @@ const ServiceProducto = {
   getBySerie,
   getDetalleBySerie,
   update,
-  getDisponiblesPorSucursal
+  getDisponiblesPorSucursal,
+  buscar,
 };
 
 export default ServiceProducto;

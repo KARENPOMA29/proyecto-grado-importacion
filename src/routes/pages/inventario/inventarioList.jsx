@@ -1,5 +1,5 @@
 // src/pages/movimientos/MovimientoList.jsx
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Eye,
   Trash,
@@ -11,6 +11,7 @@ import {
   Boxes,
   ChevronRight,
   Plus,
+  Pencil,
 } from "lucide-react";
 
 import {
@@ -24,16 +25,18 @@ import {
 } from "@mui/material";
 
 import GridGenerico from "@/components/Grid";
-import Details from "@/components/details";
 import DeleteConfirm from "@/components/deleteConfirm";
+import ErrorDialog from "@/components/ErrorDialog";
+
+import MovimientoDetalleDialog from "./MovimientoDetalleDialog";
+import MovimientoEditDialog from "./MovimientoEditDialog";
+import InventarioFlow from "./InventarioFlow";
 
 import ServiceMovimiento from "@/services/ServiceMovimiento";
-import ServiceProducto from "@/services/ServiceProducto";
 import ServiceCiudad from "@/services/ServiceCiudad";
 import ServiceSucursal from "@/services/ServiceSucursal";
 import ServiceAlmacen from "@/services/ServiceAlmacen";
 
-import InventarioFlow from "./InventarioFlow";
 import { toast } from "react-toastify";
 import { useAuth } from "@/context/AuthContext";
 
@@ -45,160 +48,140 @@ const STEP_TITLES = [
 ];
 
 const MovimientoList = () => {
-  const [selectedId, setSelectedId] = useState(null);
-  const [idToDelete, setIdToDelete] = useState(null);
-  const [showInventarioFlow, setShowInventarioFlow] = useState(false);
   const gridRef = useRef(null);
 
-  // Wizard
   const [step, setStep] = useState(0);
+
   const [ciudades, setCiudades] = useState([]);
-  const [selectedCiudad, setSelectedCiudad] = useState(null);
-
   const [sucursales, setSucursales] = useState([]);
-  const [selectedSucursal, setSelectedSucursal] = useState(null);
-
   const [almacenes, setAlmacenes] = useState([]);
+
+  const [selectedCiudad, setSelectedCiudad] = useState(null);
+  const [selectedSucursal, setSelectedSucursal] = useState(null);
   const [selectedAlmacen, setSelectedAlmacen] = useState(null);
 
   const [loadingSucursales, setLoadingSucursales] = useState(false);
   const [loadingAlmacenes, setLoadingAlmacenes] = useState(false);
-  const [estadoProductoFiltro, setEstadoProductoFiltro] = useState("");
-  const [fechaFiltro, setFechaFiltro] = useState("");
-  // Cache productos para mostrar serie en la tabla/detalle
-  const [productos, setProductos] = useState([]);
 
-  // Auth y roles
+  const [selectedId, setSelectedId] = useState(null);
+  const [editId, setEditId] = useState(null);
+  const [idToDelete, setIdToDelete] = useState(null);
+  const [showInventarioFlow, setShowInventarioFlow] = useState(false);
+
+  const [showError, setShowError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
   const { user } = useAuth();
-  const rawRoleKey =
+
+  const roleKey = (
     user?.rol ||
     user?.role ||
     user?.perfil?.rol ||
     user?.perfil?.nombre ||
-    "";
-  const roleKey = rawRoleKey.toString().trim().toLowerCase();
+    ""
+  )
+    .toString()
+    .trim()
+    .toLowerCase();
 
   const isAdmin = roleKey === "administrador";
   const isAlmacen = roleKey === "almacen";
 
   const empleadoSucursalId =
     user?.idSucursal ?? user?.sucursalId ?? user?.empleado?.sucursalId ?? null;
+
   const usuarioIdLogueado =
     user?.empleadoId ?? user?.idEmpleado ?? user?.id ?? null;
 
   const canCreate = isAdmin || isAlmacen;
   const canDelete = isAdmin;
 
-  /* ========= CARGA INICIAL: productos + ciudades ========= */
-
   useEffect(() => {
-    (async () => {
+    const cargarCiudades = async () => {
       try {
-        const [prodRes, ciudadRes] = await Promise.all([
-          ServiceProducto.getAll?.(),
-          ServiceCiudad.getAll?.(),
-        ]);
-
-        const prodList = Array.isArray(prodRes)
-          ? prodRes
-          : prodRes?.items ?? [];
-        const ciudadList = Array.isArray(ciudadRes)
-          ? ciudadRes
-          : ciudadRes?.items ?? [];
-
-        setProductos(prodList);
-        setCiudades(ciudadList);
-      } catch (err) {
-        console.error(err);
-        toast.error("Error al cargar datos base (productos, ciudades)");
+        const res = await ServiceCiudad.getAll?.();
+        setCiudades(Array.isArray(res) ? res : res?.items ?? []);
+      } catch (error) {
+        console.error(error);
+        toast.error("Error al cargar ciudades");
       }
-    })();
+    };
+
+    cargarCiudades();
   }, []);
 
-  /* ========= CONFIGURACIÓN POR ROL ========= */
-
   useEffect(() => {
-    // ADMIN: arranca en paso 0 (ciudad)
-    if (isAdmin) {
-      setStep(0);
-      return;
-    }
+    if (!isAlmacen || !empleadoSucursalId) return;
 
-    // ALMACEN: cargar su sucursal y luego almacenes de esa sucursal
-    if (isAlmacen && empleadoSucursalId) {
-      (async () => {
-        try {
-          // 1) cargar sucursal del empleado
-          const suc = await ServiceSucursal.getById(empleadoSucursalId);
-          setSelectedSucursal(suc);
+    const cargarDatosAlmacen = async () => {
+      try {
+        const sucursal = await ServiceSucursal.getById(empleadoSucursalId);
+        setSelectedSucursal(sucursal);
 
-          // 2) cargar almacenes de esa sucursal
-          setLoadingAlmacenes(true);
-          const resAlm = await ServiceAlmacen.getAll({
-            sucursalId: suc.id,
-          });
-          const almList = Array.isArray(resAlm)
-            ? resAlm
-            : resAlm.items ?? [];
-          setAlmacenes(almList);
+        setLoadingAlmacenes(true);
 
-          // 3) ir al paso 2 (selección de almacén)
-          setStep(2);
-        } catch (err) {
-          console.error(err);
-          toast.error(
-            "No se pudo cargar la sucursal o almacenes asignados al usuario de almacén"
-          );
-        } finally {
-          setLoadingAlmacenes(false);
-        }
-      })();
-    }
-  }, [isAdmin, isAlmacen, empleadoSucursalId]);
+        const res = await ServiceAlmacen.getAll({
+          sucursalId: sucursal.id,
+        });
 
-  /* ========= CARGAR SUCURSALES AL SELECCIONAR CIUDAD (ADMIN) ========= */
+        setAlmacenes(Array.isArray(res) ? res : res.items ?? []);
+        setStep(2);
+      } catch (error) {
+        console.error(error);
+        toast.error("No se pudo cargar la sucursal o almacenes asignados");
+      } finally {
+        setLoadingAlmacenes(false);
+      }
+    };
+
+    cargarDatosAlmacen();
+  }, [isAlmacen, empleadoSucursalId]);
 
   const handleSelectCiudad = async (ciudad) => {
+    // Limpiar estados anteriores de forma segura
     setSelectedCiudad(ciudad);
     setSelectedSucursal(null);
     setSelectedAlmacen(null);
     setSucursales([]);
     setAlmacenes([]);
-    setLoadingSucursales(true);
 
     try {
+      setLoadingSucursales(true);
+
       const res = await ServiceSucursal.getAll({
         ciudadId: ciudad.id,
       });
-      const data = Array.isArray(res) ? res : res.items ?? [];
-      setSucursales(data);
+
+      setSucursales(Array.isArray(res) ? res : res.items ?? []);
       setStep(1);
-    } catch (err) {
-      console.error(err);
-      toast.error("Error al cargar sucursales para la ciudad seleccionada");
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al cargar sucursales");
+      setSucursales([]); // Asegurar que quede un array vacío en caso de error
     } finally {
       setLoadingSucursales(false);
     }
   };
 
-  /* ========= CARGAR ALMACENES AL SELECCIONAR SUCURSAL ========= */
-
   const handleSelectSucursal = async (sucursal) => {
+    // Limpiar estados anteriores de forma segura
     setSelectedSucursal(sucursal);
     setSelectedAlmacen(null);
     setAlmacenes([]);
-    setLoadingAlmacenes(true);
 
     try {
+      setLoadingAlmacenes(true);
+
       const res = await ServiceAlmacen.getAll({
         sucursalId: sucursal.id,
       });
-      const data = Array.isArray(res) ? res : res.items ?? [];
-      setAlmacenes(data);
+
+      setAlmacenes(Array.isArray(res) ? res : res.items ?? []);
       setStep(2);
-    } catch (err) {
-      console.error(err);
-      toast.error("Error al cargar almacenes para la sucursal seleccionada");
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al cargar almacenes");
+      setAlmacenes([]); // Asegurar que quede un array vacío en caso de error
     } finally {
       setLoadingAlmacenes(false);
     }
@@ -209,191 +192,180 @@ const MovimientoList = () => {
     setStep(3);
   };
 
-  /* ========= MAPA PRODUCTOS (por si lo quieres usar luego) ========= */
+  const handleGoBack = () => {
+    if (isAdmin) {
+      if (step === 1) {
+        // Regresar de sucursales a ciudades
+        setStep(0);
+        setSelectedCiudad(null);
+        setSelectedSucursal(null);
+        setSelectedAlmacen(null);
+        setSucursales([]);
+        setAlmacenes([]);
+        return;
+      }
 
-  const getProductoIdFromRow = (rowOrId) => {
-    if (!rowOrId) return null;
-    if (typeof rowOrId === "number") return rowOrId;
-    return (
-      rowOrId.productoId ||
-      rowOrId.producto_id ||
-      rowOrId.producto?.id ||
-      null
-    );
+      if (step === 2) {
+        // Regresar de almacenes a sucursales
+        setStep(1);
+        setSelectedSucursal(null);
+        setSelectedAlmacen(null);
+        setAlmacenes([]);
+        return;
+      }
+
+      if (step === 3) {
+        // Regresar de movimientos a almacenes
+        setStep(2);
+        setSelectedAlmacen(null);
+        return;
+      }
+    }
+
+    if (isAlmacen && step === 3) {
+      setStep(2);
+      setSelectedAlmacen(null);
+    }
   };
 
-  const getProductoFromCache = (id) => {
-    if (!id) return null;
-    return productos.find((x) => x.id === id) || null;
+  const getTotalSecciones = (almacen) => {
+    if (!almacen) return 0;
+    
+    if (almacen?.totalSecciones !== undefined) return almacen.totalSecciones;
+
+    if (Array.isArray(almacen?.secciones)) {
+      return almacen.secciones.filter((s) => Number(s.estado) === 1).length;
+    }
+
+    return 0;
+  };
+
+  const formatFecha = (value) => {
+    if (!value) return "—";
+
+    const fecha = String(value).split("T")[0];
+    const [yyyy, mm, dd] = fecha.split("-");
+
+    if (!yyyy || !mm || !dd) return "—";
+
+    return `${dd}/${mm}/${yyyy}`;
   };
 
   const getTextoProducto = (row) => {
-    if (row.productoSerie) return row.productoSerie;
-    if (row.producto?.numeroSerie) return row.producto.numeroSerie;
-
-    const prodId = getProductoIdFromRow(row);
-    if (!prodId) return "—";
-    const p = getProductoFromCache(prodId);
-    if (!p) return `Producto #${prodId}`;
+    if (!row) return "—";
+    
     return (
-      p.numeroSerie || p.descripcion || p.serie || p.codigo || `Producto #${prodId}`
+      row.productoSerie ||
+      row.producto?.numeroSerie ||
+      row.producto?.descripcion ||
+      `Producto #${row.productoId || row.producto?.id || "—"}`
     );
   };
-
-  /* ========= COLUMNAS Y DETALLES ========= */
 
   const columns = [
     {
       name: "Producto (serie)",
-      selector: (r) => getTextoProducto(r),
+      selector: (row) => getTextoProducto(row),
       sortable: true,
       minWidth: "170px",
     },
     {
-  name: "Estado producto",
-    selector: (r) => r.productoEstado ?? "",
-    sortable: true,
-    minWidth: "150px",
-    cell: (r) => {
-      const estado = Number(r.productoEstado);
-
-      const label =
-        estado === 1 ? "Disponible" :
-        estado === 2 ? "Vendido" :
-        estado === 0 ? "Inactivo" :
-        "—";
-
-      const sx =
-        estado === 1
-          ? { bgcolor: "#E8F5E9", color: "#1B5E20" }
-          : estado === 2
-          ? { bgcolor: "#FEE2E2", color: "#991B1B" }
-          : { bgcolor: "#F3F4F6", color: "#374151" };
-
-      return (
-        <Chip
-          size="small"
-          label={label}
-          sx={{
-            fontWeight: 800,
-            borderRadius: "10px",
-            ...sx,
-          }}
-        />
-      );
-    },
-  },
-    {
-      name: "Almacén",
-      selector: (r) =>
-        r.almacen?.nombre || r.almacenNombre || r.almacenId || "—",
+      name: "Categoría",
+      selector: (row) => row?.categoria?.nombre || "—",
       sortable: true,
-      minWidth: "140px",
+      minWidth: "150px",
     },
     {
-      name: "Tipo",
-      selector: (r) => r.tipoMovimiento ?? "—",
+      name: "Modelo",
+      selector: (row) =>
+        row?.modeloProducto?.nombreModelo || row?.modeloProducto?.nombre || "—",
       sortable: true,
-      minWidth: "110px",
+      minWidth: "170px",
+    },
+    {
+      name: "Importación",
+      selector: (row) => row?.importacion?.codigo || "—",
+      sortable: true,
+      minWidth: "150px",
+    },
+    {
+      name: "Observado",
+      selector: (row) => row?.productoObservado ?? "",
+      sortable: true,
+      minWidth: "130px",
+      cell: (row) => {
+        const observado = Number(row?.productoObservado);
+
+        const label =
+          observado === 2 ? "Sí" : observado === 1 ? "No" : "—";
+
+        const sx =
+          observado === 2
+            ? { bgcolor: "#FEF3C7", color: "#92400E" }
+            : observado === 1
+            ? { bgcolor: "#E8F5E9", color: "#1B5E20" }
+            : { bgcolor: "#F3F4F6", color: "#374151" };
+
+        return (
+          <Chip
+            size="small"
+            label={label}
+            sx={{
+              fontWeight: 800,
+              borderRadius: "10px",
+              ...sx,
+            }}
+          />
+        );
+      },
+    },
+    {
+      name: "Estado producto",
+      selector: (row) => row?.productoEstado ?? "",
+      sortable: true,
+      minWidth: "150px",
+      cell: (row) => {
+        const estado = Number(row?.productoEstado);
+
+        const label =
+          estado === 1
+            ? "Disponible"
+            : estado === 2
+            ? "Vendido"
+            : estado === 0
+            ? "Inactivo"
+            : "—";
+
+        const sx =
+          estado === 1
+            ? { bgcolor: "#E8F5E9", color: "#1B5E20" }
+            : estado === 2
+            ? { bgcolor: "#FEE2E2", color: "#991B1B" }
+            : { bgcolor: "#F3F4F6", color: "#374151" };
+
+        return (
+          <Chip
+            size="small"
+            label={label}
+            sx={{
+              fontWeight: 800,
+              borderRadius: "10px",
+              ...sx,
+            }}
+          />
+        );
+      },
     },
     {
       name: "Fecha",
-      selector: (r) => r.fecha || r.fechaRegistro || "",
+      selector: (row) => row?.fecha || row?.fechaRegistro || "",
       sortable: true,
       minWidth: "120px",
-
-      cell: (r) => {
-        const value = r.fecha || r.fechaRegistro;
-
-        if (!value) return "—";
-
-        const fecha = String(value).split("T")[0];
-        const [yyyy, mm, dd] = fecha.split("-");
-
-        return `${dd}/${mm}/${yyyy}`;
-      },
+      cell: (row) => formatFecha(row?.fecha || row?.fechaRegistro),
     },
   ];
-
-  const detailsFields = [
-    {
-      label: "Producto (serie)",
-      key: "productoSerie",
-      format: (v, row) => v ?? row?.producto?.numeroSerie ?? "—",
-    },
-    {
-      label: "Estado del producto",
-      key: "productoEstado",
-      format: (v) => {
-        const estado = Number(v);
-
-        if (estado === 1) return "Disponible";
-        if (estado === 2) return "Vendido";
-        if (estado === 0) return "Inactivo";
-
-        return "—";
-      },
-    },
-    {
-      label: "Producto (descripción)",
-      key: "productoDescripcion",
-      format: (v, row) =>
-        v ?? row?.productoDescripcion ?? row?.producto?.descripcion ?? "—",
-    },
-    {
-      label: "Observado",
-      key: "productoObservado",
-      format: (v) =>
-        v === 1 ? "No" : v === 2 ? "Sí" : v == null ? "—" : String(v),
-    },
-    {
-      label: "Detalle observación",
-      key: "productoObsDescripcion",
-    },
-    { label: "Tipo de movimiento", key: "tipoMovimiento" },
-    {
-      label: "Almacén",
-      key: "almacen",
-      format: (a, row) => a?.nombre ?? row?.almacenNombre ?? "—",
-    },
-    {
-      label: "Fecha",
-      key: "fecha",
-      format: (v) => {
-        if (!v) return "—";
-
-        const fecha = String(v).split("T")[0];
-        const [yyyy, mm, dd] = fecha.split("-");
-
-        return `${dd}/${mm}/${yyyy}`;
-      },
-    },
-    {
-      label: "Precio",
-      key: "producto",
-      format: (p) => (p?.precio != null ? `${p.precio} Bs` : "—"),
-    },
-    {
-      label: "Categoría",
-      key: "categoria",
-      format: (c) => c?.nombre ?? "—",
-    },
-    {
-      label: "Modelo",
-      key: "modeloProducto",
-      format: (m) => m?.nombreModelo ?? m?.nombre ?? "—",
-    },
-    {
-      label: "Importación",
-      key: "importacion",
-      format: (i) => i?.codigo ?? "—",
-    },
-  ];
-
 
   const baseMovimientoService = useMemo(() => {
-    if (isAdmin) return ServiceMovimiento;
-
     if (isAlmacen && usuarioIdLogueado) {
       return {
         ...ServiceMovimiento,
@@ -406,7 +378,7 @@ const MovimientoList = () => {
     }
 
     return ServiceMovimiento;
-  }, [isAdmin, isAlmacen, usuarioIdLogueado]);
+  }, [isAlmacen, usuarioIdLogueado]);
 
   const serviceMovimientoFiltrado = useMemo(() => {
     return {
@@ -415,38 +387,42 @@ const MovimientoList = () => {
         if (!selectedAlmacen?.id) {
           return { items: [], total: 0 };
         }
+
         return baseMovimientoService.getAll({
           ...params,
           almacenId: selectedAlmacen.id,
-          estadoProducto: estadoProductoFiltro || undefined,
-          fecha: fechaFiltro || undefined,
         });
       },
     };
   }, [baseMovimientoService, selectedAlmacen]);
 
   useEffect(() => {
-    if (step === 3 && gridRef.current?.refetch) {
-      gridRef.current.refetch();
+    if (step === 3 && gridRef.current) {
+      gridRef.current.refetch?.();
     }
   }, [selectedAlmacen, step]);
 
-  /* ========= HANDLERS ========= */
-
-  const handleOpenDetails = (id) => {
-    setSelectedId(id);
-  };
-
   const handleDelete = async () => {
     if (!idToDelete) return;
+
     try {
       await ServiceMovimiento.remove(idToDelete);
-      toast.success("Movimiento eliminado");
+
+      toast.success("Movimiento eliminado correctamente");
       setIdToDelete(null);
-      gridRef.current?.refetch();
-    } catch (e) {
-      console.error(e);
-      toast.error(e.message || "No se pudo eliminar el movimiento");
+      if (gridRef.current) {
+        gridRef.current.refetch?.();
+      }
+    } catch (error) {
+      const message = error?.message || "No se pudo eliminar el movimiento";
+
+      setErrorMessage(message);
+      setShowError(true);
+      setIdToDelete(null);
+
+      setTimeout(() => {
+        setShowError(false);
+      }, 3000);
     }
   };
 
@@ -455,611 +431,464 @@ const MovimientoList = () => {
       toast.warning("Debes seleccionar un almacén primero");
       return;
     }
+
     setShowInventarioFlow(true);
   };
 
-  const handleGoBack = () => {
-    // ADMIN navega por el wizard completo
-    if (isAdmin) {
-      if (step === 1) {
-        setStep(0);
-        setSelectedCiudad(null);
-        setSelectedSucursal(null);
-        setSelectedAlmacen(null);
-        setSucursales([]);
-        setAlmacenes([]);
-      } else if (step === 2) {
-        setStep(1);
-        setSelectedSucursal(null);
-        setSelectedAlmacen(null);
-        setAlmacenes([]);
-      } else if (step === 3) {
-        setStep(2);
-        setSelectedAlmacen(null);
-      }
-      return;
-    }
+  const renderCiudadStep = () => (
+    <Box>
+      <Typography variant="body2" color="text.secondary" mb={2}>
+        Selecciona la ciudad donde deseas ver los almacenes y movimientos.
+      </Typography>
 
-    // ALMACEN: solo puede volver de lista a selección de almacén
-    if (isAlmacen && step === 3) {
-      setStep(2);
-      setSelectedAlmacen(null);
-    }
-  };
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+        {ciudades.map((ciudad) => {
+          const seleccionada = selectedCiudad?.id === ciudad.id;
 
-  /* ========= RENDER DE CADA PASO ========= */
-
-  const renderStep = () => {
-    // Si es rol almacén y aún no se cargó sucursal/almacenes
-    if (isAlmacen && !selectedSucursal) {
-      return (
-        <Box sx={{ textAlign: "center", py: 4 }}>
-          <CircularProgress sx={{ color: "#592B2B", mb: 2 }} />
-          <Typography variant="body2" color="text.secondary">
-            Cargando datos de tu sucursal y almacenes...
-          </Typography>
-        </Box>
-      );
-    }
-
-    switch (step) {
-      case 0: // Seleccionar Ciudad (solo admin)
-        return (
-          <Box>
-            <Typography variant="body2" color="text.secondary" mb={2}>
-              Selecciona la ciudad donde deseas ver los almacenes y movimientos.
-            </Typography>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              {ciudades.map((c) => {
-                const seleccionada = selectedCiudad?.id === c.id;
-                return (
-                  <Card
-                    key={c.id}
-                    variant="outlined"
-                    onClick={() => handleSelectCiudad(c)}
-                    sx={{
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                      "&:hover": {
-                        borderColor: "#592B2B",
-                        backgroundColor: "#592B2B08",
-                        transform: "translateY(-2px)",
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                      },
-                    }}
-                  >
-                    <Box sx={{ p: 2 }}>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 2,
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: "50%",
-                              bgcolor: seleccionada ? "#592B2B" : "#592B2B20",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <Building
-                              size={20}
-                              color={seleccionada ? "white" : "#592B2B"}
-                            />
-                          </Box>
-                          <Box sx={{ textAlign: "left" }}>
-                            <Typography
-                              fontSize={16}
-                              fontWeight={600}
-                              color="#3A1A1A"
-                            >
-                              {c.nombre || `Ciudad #${c.id}`}
-                            </Typography>
-                            {c.departamento && (
-                              <Typography
-                                fontSize={12}
-                                color="text.secondary"
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 0.5,
-                                }}
-                              >
-                                <MapPin size={12} />
-                                {c.departamento}
-                              </Typography>
-                            )}
-                          </Box>
-                        </Box>
-                        {seleccionada && (
-                          <Box
-                            sx={{
-                              width: 24,
-                              height: 24,
-                              borderRadius: "50%",
-                              bgcolor: "#592B2B",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <Check size={14} color="white" />
-                          </Box>
-                        )}
-                      </Box>
-                    </Box>
-                  </Card>
-                );
-              })}
-
-              {ciudades.length === 0 && (
+          return (
+            <Card
+              key={ciudad.id}
+              variant="outlined"
+              onClick={() => handleSelectCiudad(ciudad)}
+              sx={{
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                "&:hover": {
+                  borderColor: "#592B2B",
+                  backgroundColor: "#592B2B08",
+                  transform: "translateY(-2px)",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                },
+              }}
+            >
+              <Box sx={{ p: 2 }}>
                 <Box
                   sx={{
-                    textAlign: "center",
-                    py: 4,
-                    border: "1px dashed #ccc",
-                    borderRadius: 2,
-                    bgcolor: "#fafafa",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 2,
                   }}
                 >
-                  <Building size={32} color="#ccc" />
-                  <Typography variant="body2" color="text.disabled" mt={1}>
-                    No hay ciudades registradas
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-          </Box>
-        );
-
-      case 1: // Seleccionar Sucursal (solo admin)
-        return (
-          <Box>
-            <Typography variant="body2" color="text.secondary" mb={2}>
-              Selecciona la sucursal de{" "}
-              <strong>{selectedCiudad?.nombre}</strong> para ver sus almacenes.
-            </Typography>
-
-            {loadingSucursales ? (
-              <Box sx={{ textAlign: "center", py: 4 }}>
-                <CircularProgress sx={{ color: "#592B2B", mb: 2 }} />
-                <Typography variant="body2" color="text.secondary">
-                  Cargando sucursales de {selectedCiudad?.nombre}...
-                </Typography>
-              </Box>
-            ) : (
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                {sucursales.map((s) => {
-                  const seleccionada = selectedSucursal?.id === s.id;
-                  return (
-                    <Card
-                      key={s.id}
-                      variant="outlined"
-                      onClick={() => handleSelectSucursal(s)}
-                      sx={{
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        "&:hover": {
-                          borderColor: "#3A1A1A",
-                          backgroundColor: "#3A1A1A08",
-                          transform: "translateY(-2px)",
-                          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                        },
-                      }}
-                    >
-                      <Box sx={{ p: 2 }}>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 2,
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                width: 40,
-                                height: 40,
-                                borderRadius: "50%",
-                                bgcolor: seleccionada
-                                  ? "#3A1A1A"
-                                  : "#3A1A1A20",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              <Store
-                                size={20}
-                                color={seleccionada ? "white" : "#3A1A1A"}
-                              />
-                            </Box>
-                            <Box sx={{ textAlign: "left" }}>
-                              <Typography
-                                fontSize={16}
-                                fontWeight={600}
-                                color="#3A1A1A"
-                              >
-                                {s.nombre}
-                              </Typography>
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 1,
-                                  flexWrap: "wrap",
-                                }}
-                              >
-                                <Typography
-                                  fontSize={12}
-                                  color="text.secondary"
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 0.5,
-                                  }}
-                                >
-                                  <MapPin size={12} />
-                                  {s.direccion || "Sin dirección"}
-                                </Typography>
-                                {s.telefono && (
-                                  <Typography
-                                    fontSize={12}
-                                    color="text.secondary"
-                                  >
-                                    • 📞 {s.telefono}
-                                  </Typography>
-                                )}
-                              </Box>
-                            </Box>
-                          </Box>
-                          {seleccionada && (
-                            <Box
-                              sx={{
-                                width: 24,
-                                height: 24,
-                                borderRadius: "50%",
-                                bgcolor: "#3A1A1A",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              <Check size={14} color="white" />
-                            </Box>
-                          )}
-                        </Box>
-                      </Box>
-                    </Card>
-                  );
-                })}
-
-                {sucursales.length === 0 && (
-                  <Box
-                    sx={{
-                      textAlign: "center",
-                      py: 4,
-                      border: "1px dashed #ccc",
-                      borderRadius: 2,
-                      bgcolor: "#fafafa",
-                    }}
-                  >
-                    <Store size={32} color="#ccc" />
-                    <Typography variant="body2" color="text.disabled" mt={1}>
-                      No hay sucursales disponibles en {selectedCiudad?.nombre}
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
-            )}
-          </Box>
-        );
-
-      case 2: // Seleccionar Almacén (admin y almacén)
-        return (
-          <Box>
-            <Typography variant="body2" color="text.secondary" mb={2}>
-              Sucursal:{" "}
-              <strong>{selectedSucursal?.nombre || "Sin sucursal"}</strong>.
-              Selecciona un almacén para ver sus movimientos.
-            </Typography>
-
-            {loadingAlmacenes ? (
-              <Box sx={{ textAlign: "center", py: 4 }}>
-                <CircularProgress sx={{ color: "#592B2B", mb: 2 }} />
-                <Typography variant="body2" color="text.secondary">
-                  Cargando almacenes...
-                </Typography>
-              </Box>
-            ) : (
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                {almacenes.map((a) => {
-                  const seleccionada = selectedAlmacen?.id === a.id;
-                  return (
-                    <Card
-                      key={a.id}
-                      variant="outlined"
-                      onClick={() => handleSelectAlmacen(a)}
-                      sx={{
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        "&:hover": {
-                          borderColor: "#592B2B",
-                          backgroundColor: "#592B2B08",
-                          transform: "translateY(-2px)",
-                          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                        },
-                      }}
-                    >
-                      <Box sx={{ p: 2 }}>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 2,
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                width: 40,
-                                height: 40,
-                                borderRadius: "50%",
-                                bgcolor: seleccionada
-                                  ? "#592B2B"
-                                  : "#592B2B20",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              <Boxes
-                                size={20}
-                                color={seleccionada ? "white" : "#592B2B"}
-                              />
-                            </Box>
-                            <Box sx={{ textAlign: "left" }}>
-                              <Typography
-                                fontSize={16}
-                                fontWeight={600}
-                                color="#3A1A1A"
-                              >
-                                {a.nombre}
-                              </Typography>
-                              <Typography
-                                fontSize={12}
-                                color="text.secondary"
-                              >
-                                dirección: {a.direccion ?? "—"}
-                              </Typography>
-                            </Box>
-                          </Box>
-                          {seleccionada && (
-                            <Box
-                              sx={{
-                                width: 24,
-                                height: 24,
-                                borderRadius: "50%",
-                                bgcolor: "#592B2B",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              <Check size={14} color="white" />
-                            </Box>
-                          )}
-                        </Box>
-                      </Box>
-                    </Card>
-                  );
-                })}
-
-                {almacenes.length === 0 && (
-                  <Box
-                    sx={{
-                      textAlign: "center",
-                      py: 4,
-                      border: "1px dashed #ccc",
-                      borderRadius: 2,
-                      bgcolor: "#fafafa",
-                    }}
-                  >
-                    <Boxes size={32} color="#ccc" />
-                    <Typography variant="body2" color="text.disabled" mt={1}>
-                      No hay almacenes disponibles en esta sucursal
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
-            )}
-          </Box>
-        );
-
-      case 3: // Lista de movimientos (admin y almacén)
-      default:
-        return (
-          <Box>
-            {/* Card de Almacén */}
-            <Card
-              variant="outlined"
-              sx={{ mb: 3, bgcolor: "#592B2B08", borderColor: "#592B2B20" }}
-            >
-              <Box
-                sx={{
-                  p: 2,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                  <Box
-                    sx={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: "50%",
-                      bgcolor: "#592B2B20",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Boxes size={24} color="#592B2B" />
-                  </Box>
-                  <Box>
-                    <Typography
-                      variant="h6"
-                      fontWeight={700}
-                      color="#3A1A1A"
-                    >
-                      {selectedAlmacen?.nombre || "Almacén"}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      {selectedSucursal?.nombre && (
-                        <>
-                          <Store size={14} />
-                          <span>{selectedSucursal.nombre}</span>
-                        </>
-                      )}
-                      {selectedAlmacen?.direccion && (
-                        <>
-                          <span>•</span>
-                          <span>Dirección: {selectedAlmacen.direccion}</span>
-                        </>
-                      )}
-                      {isAlmacen && (
-                        <Typography
-                          component="span"
-                          sx={{
-                            color: "#0D8C47",
-                            bgcolor: "#0D8C4710",
-                            px: 1,
-                            py: 0.25,
-                            borderRadius: 1,
-                            fontSize: 11,
-                            ml: 1,
-                          }}
-                        >
-                          Mi almacén
-                        </Typography>
-                      )}
-                    </Typography>
-                  </Box>
-                </Box>
-
-                {canCreate && (
-                  <Button
-                    variant="contained"
-                    onClick={handleOpenNewMovimiento}
-                    startIcon={<Plus size={18} />}
-                    sx={{
-                      borderRadius: 2,
-                      px: 3,
-                      py: 1,
-                      fontWeight: 600,
-                      textTransform: "none",
-                      background:
-                        "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
-                      boxShadow: "0 4px 10px rgba(89,43,43,0.25)",
-                      "&:hover": {
-                        background:
-                          "linear-gradient(135deg, #3A1A1A 0%, #592B2B 100%)",
-                        boxShadow: "0 6px 16px rgba(89,43,43,0.35)",
-                      },
-                    }}
-                  >
-                    Nuevo movimiento
-                  </Button>
-                )}
-              </Box>
-            </Card>
-
-            {/* Tabla de movimientos */}
-            <Box sx={{ width: "100%", overflowX: "auto" }}>
-              <Box sx={{ minWidth: 600 }}>
-                <GridGenerico
-                  ref={gridRef}
-                  service={serviceMovimientoFiltrado}
-                  columns={columns}
-                  defaultSortField="fecha"
-                  defaultSortAsc={false}
-                  pageSize={10}
-                  title="Movimientos"
-                  renderActions={(row) => (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                     <Box
                       sx={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: "50%",
+                        bgcolor: seleccionada ? "#592B2B" : "#592B2B20",
                         display: "flex",
-                        gap: 1,
-                        justifyContent: "flex-end",
+                        alignItems: "center",
+                        justifyContent: "center",
                       }}
                     >
-                      <IconButton
-                        size="small"
-                        onClick={() => handleOpenDetails(row.id)}
-                        sx={{ color: "#592B2B" }}
-                        title="Ver detalles"
-                      >
-                        <Eye size={16} />
-                      </IconButton>
+                      <Building
+                        size={20}
+                        color={seleccionada ? "white" : "#592B2B"}
+                      />
+                    </Box>
 
-                      {canDelete && (
-                        <IconButton
-                          size="small"
-                          onClick={() => setIdToDelete(row.id)}
-                          sx={{ color: "#d32f2f" }}
-                          title="Eliminar movimiento"
+                    <Box>
+                      <Typography fontSize={16} fontWeight={700} color="#3A1A1A">
+                        {ciudad.nombre || `Ciudad #${ciudad.id}`}
+                      </Typography>
+
+                      {ciudad.departamento && (
+                        <Typography
+                          fontSize={12}
+                          color="text.secondary"
+                          sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
                         >
-                          <Trash size={16} />
-                        </IconButton>
+                          <MapPin size={12} />
+                          {ciudad.departamento}
+                        </Typography>
                       )}
                     </Box>
-                  )}
-                />
+                  </Box>
+
+                  <Chip
+                    size="small"
+                    label={`${ciudad.totalSucursales ?? 0} sucursales`}
+                    sx={{
+                      bgcolor: "#592B2B10",
+                      color: "#592B2B",
+                      fontWeight: 700,
+                      borderRadius: "10px",
+                    }}
+                  />
+                </Box>
               </Box>
+            </Card>
+          );
+        })}
+
+        {ciudades.length === 0 && (
+          <EmptyState icon={<Building size={32} />} text="No hay ciudades registradas" />
+        )}
+      </Box>
+    </Box>
+  );
+
+  const renderSucursalStep = () => (
+    <Box>
+      <Typography variant="body2" color="text.secondary" mb={2}>
+        Selecciona la sucursal de <strong>{selectedCiudad?.nombre || "la ciudad seleccionada"}</strong>.
+      </Typography>
+
+      {loadingSucursales ? (
+        <LoadingState text={`Cargando sucursales de ${selectedCiudad?.nombre || "la ciudad"}...`} />
+      ) : (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          {sucursales.map((sucursal) => {
+            const seleccionada = selectedSucursal?.id === sucursal.id;
+
+            return (
+              <Card
+                key={sucursal.id}
+                variant="outlined"
+                onClick={() => handleSelectSucursal(sucursal)}
+                sx={{
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  "&:hover": {
+                    borderColor: "#3A1A1A",
+                    backgroundColor: "#3A1A1A08",
+                    transform: "translateY(-2px)",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                  },
+                }}
+              >
+                <Box sx={{ p: 2 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 2,
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                      <Box
+                        sx={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: "50%",
+                          bgcolor: seleccionada ? "#3A1A1A" : "#3A1A1A20",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Store
+                          size={20}
+                          color={seleccionada ? "white" : "#3A1A1A"}
+                        />
+                      </Box>
+
+                      <Box>
+                        <Typography fontSize={16} fontWeight={700} color="#3A1A1A">
+                          {sucursal.nombre}
+                        </Typography>
+
+                        <Typography
+                          fontSize={12}
+                          color="text.secondary"
+                          sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                        >
+                          <MapPin size={12} />
+                          {sucursal.direccion || "Sin dirección"}
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    <Chip
+                      size="small"
+                      label={`${sucursal.totalAlmacenes ?? 0} almacenes`}
+                    />
+                  </Box>
+                </Box>
+              </Card>
+            );
+          })}
+
+          {sucursales.length === 0 && !loadingSucursales && (
+            <EmptyState
+              icon={<Store size={32} />}
+              text={`No hay sucursales disponibles en ${selectedCiudad?.nombre || "esta ciudad"}`}
+            />
+          )}
+        </Box>
+      )}
+    </Box>
+  );
+
+  const renderAlmacenStep = () => (
+    <Box>
+      <Typography variant="body2" color="text.secondary" mb={2}>
+        Sucursal: <strong>{selectedSucursal?.nombre || "Sin sucursal"}</strong>.
+        Selecciona un almacén para ver sus movimientos.
+      </Typography>
+
+      {loadingAlmacenes ? (
+        <LoadingState text="Cargando almacenes..." />
+      ) : (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          {almacenes.map((almacen) => {
+            const seleccionada = selectedAlmacen?.id === almacen.id;
+
+            return (
+              <Card
+                key={almacen.id}
+                variant="outlined"
+                onClick={() => handleSelectAlmacen(almacen)}
+                sx={{
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  "&:hover": {
+                    borderColor: "#592B2B",
+                    backgroundColor: "#592B2B08",
+                    transform: "translateY(-2px)",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                  },
+                }}
+              >
+                <Box sx={{ p: 2 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 2,
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                      <Box
+                        sx={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: "50%",
+                          bgcolor: seleccionada ? "#592B2B" : "#592B2B20",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Boxes
+                          size={20}
+                          color={seleccionada ? "white" : "#592B2B"}
+                        />
+                      </Box>
+
+                      <Box>
+                        <Typography fontSize={16} fontWeight={700} color="#3A1A1A">
+                          {almacen.nombre}
+                        </Typography>
+
+                        <Typography fontSize={12} color="text.secondary">
+                          Dirección: {almacen.direccion ?? "—"}
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    <Chip
+                      size="small"
+                      label={`${getTotalSecciones(almacen)} secciones`}
+                    />
+                  </Box>
+                </Box>
+              </Card>
+            );
+          })}
+
+          {almacenes.length === 0 && !loadingAlmacenes && (
+            <EmptyState
+              icon={<Boxes size={32} />}
+              text="No hay almacenes disponibles en esta sucursal"
+            />
+          )}
+        </Box>
+      )}
+    </Box>
+  );
+
+  const renderMovimientosStep = () => (
+    <Box>
+      <Card
+        variant="outlined"
+        sx={{ mb: 3, bgcolor: "#592B2B08", borderColor: "#592B2B20" }}
+      >
+        <Box
+          sx={{
+            p: 2,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
+            flexWrap: "wrap",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: "50%",
+                bgcolor: "#592B2B20",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Boxes size={24} color="#592B2B" />
+            </Box>
+
+            <Box>
+              <Typography variant="h6" fontWeight={700} color="#3A1A1A">
+                {selectedAlmacen?.nombre || "Almacén"}
+              </Typography>
+
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}
+              >
+                {selectedSucursal?.nombre && (
+                  <>
+                    <Store size={14} />
+                    <span>{selectedSucursal.nombre}</span>
+                  </>
+                )}
+
+                {selectedAlmacen?.direccion && (
+                  <>
+                    <span>•</span>
+                    <span>Dirección: {selectedAlmacen.direccion}</span>
+                  </>
+                )}
+
+                {isAlmacen && (
+                  <Typography
+                    component="span"
+                    sx={{
+                      color: "#0D8C47",
+                      bgcolor: "#0D8C4710",
+                      px: 1,
+                      py: 0.25,
+                      borderRadius: 1,
+                      fontSize: 11,
+                      ml: 1,
+                    }}
+                  >
+                    Mi almacén
+                  </Typography>
+                )}
+              </Typography>
             </Box>
           </Box>
-        );
+
+          {canCreate && (
+            <Button
+              variant="contained"
+              onClick={handleOpenNewMovimiento}
+              startIcon={<Plus size={18} />}
+              sx={{
+                borderRadius: 2,
+                px: 3,
+                py: 1,
+                fontWeight: 700,
+                textTransform: "none",
+                background: "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
+              }}
+            >
+              Nuevo movimiento
+            </Button>
+          )}
+        </Box>
+      </Card>
+
+      <Box sx={{ width: "100%", overflowX: "auto" }}>
+        <Box sx={{ minWidth: 700 }}>
+          <GridGenerico
+            ref={gridRef}
+            service={serviceMovimientoFiltrado}
+            columns={columns}
+            defaultSortField="fecha"
+            defaultSortAsc={false}
+            pageSize={10}
+            title="Movimientos"
+            renderActions={(row) => {
+              if (!row) return null;
+              
+              const vendido = Number(row.productoEstado) === 2;
+
+              return (
+                <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+                  <IconButton
+                    size="small"
+                    onClick={() => setSelectedId(row.id)}
+                    sx={{ color: "#592B2B" }}
+                    title="Ver detalles"
+                  >
+                    <Eye size={16} />
+                  </IconButton>
+
+                  {!vendido && (
+                    <IconButton
+                      size="small"
+                      onClick={() => setEditId(row.id)}
+                      sx={{ color: "#2563EB" }}
+                      title="Editar movimiento"
+                    >
+                      <Pencil size={16} />
+                    </IconButton>
+                  )}
+
+                  {canDelete && !vendido && (
+                    <IconButton
+                      size="small"
+                      onClick={() => setIdToDelete(row.id)}
+                      sx={{ color: "#d32f2f" }}
+                      title="Eliminar movimiento"
+                    >
+                      <Trash size={16} />
+                    </IconButton>
+                  )}
+                </Box>
+              );
+            }}
+          />
+        </Box>
+      </Box>
+    </Box>
+  );
+
+  const renderContent = () => {
+    // Para usuarios almacén
+    if (isAlmacen && !selectedSucursal) {
+      return <LoadingState text="Cargando datos de tu sucursal y almacenes..." />;
     }
+
+    // Para administradores según el paso
+    if (step === 0) return renderCiudadStep();
+    if (step === 1) return renderSucursalStep();
+    if (step === 2) return renderAlmacenStep();
+    if (step === 3) return renderMovimientosStep();
+
+    // Fallback seguro
+    return renderCiudadStep();
   };
 
-  /* ========= HEADER Y WIZARD SUPERIOR ========= */
+  // Validación segura para evitar errores de renderizado
+  const isStepValid = () => {
+    if (step === 0) return true;
+    if (step === 1) return selectedCiudad !== null;
+    if (step === 2) return selectedSucursal !== null;
+    if (step === 3) return selectedAlmacen !== null;
+    return true;
+  };
+
   return (
     <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
-      {/* Header */}
       <Box
         sx={{
           mb: 4,
@@ -1071,29 +900,26 @@ const MovimientoList = () => {
         }}
       >
         <Box>
-          <Typography
-            variant="h4"
-            sx={{ fontWeight: 700, color: "#3A1A1A", mb: 0.5 }}
-          >
+          <Typography variant="h4" sx={{ fontWeight: 700, color: "#3A1A1A", mb: 0.5 }}>
             Movimientos de Inventario
           </Typography>
+
           <Typography variant="body2" color="text.secondary">
             {isAlmacen
               ? selectedSucursal && selectedAlmacen
                 ? `Movimientos en ${selectedAlmacen.nombre}`
-                : `Selecciona tu almacén para ver los movimientos`
+                : "Selecciona tu almacén para ver los movimientos"
               : step === 0
               ? "Selecciona una ciudad para comenzar"
               : step === 1
-              ? `Sucursales de ${selectedCiudad?.nombre}`
+              ? `Sucursales de ${selectedCiudad?.nombre || "la ciudad seleccionada"}`
               : step === 2
-              ? `Almacenes de ${selectedSucursal?.nombre}`
-              : `Movimientos del almacén ${selectedAlmacen?.nombre}`}
+              ? `Almacenes de ${selectedSucursal?.nombre || "la sucursal seleccionada"}`
+              : `Movimientos del almacén ${selectedAlmacen?.nombre || "seleccionado"}`}
           </Typography>
         </Box>
 
-        {/* Botón Volver */}
-        {(isAdmin && step > 0) || (isAlmacen && step === 3) ? (
+        {((isAdmin && step > 0) || (isAlmacen && step === 3)) && (
           <Button
             variant="outlined"
             onClick={handleGoBack}
@@ -1102,678 +928,39 @@ const MovimientoList = () => {
               borderRadius: 2,
               px: 3,
               py: 1,
-              fontWeight: 500,
+              fontWeight: 600,
               textTransform: "none",
               borderColor: "#592B2B",
               color: "#592B2B",
-              "&:hover": {
-                borderColor: "#3A1A1A",
-                backgroundColor: "rgba(89,43,43,0.04)",
-              },
             }}
           >
             Volver
           </Button>
-        ) : null}
+        )}
       </Box>
 
-      {/* Wizard (solo admin) */}
       {!isAlmacen && (
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            mb: 4,
-            gap: 1,
-            flexWrap: "wrap",
-          }}
-        >
-          {STEP_TITLES.map((title, idx) => {
-            const active = step === idx;
-            const done = step > idx;
-            const canNavigate = done;
-
-            return (
-              <Box key={title} sx={{ display: "flex", alignItems: "center" }}>
-                <Box
-                  sx={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: "50%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 600,
-                    fontSize: 14,
-                    cursor: canNavigate ? "pointer" : "default",
-                    transition: "all 0.2s ease",
-                    ...(active
-                      ? {
-                          bgcolor: "#592B2B",
-                          color: "white",
-                          boxShadow: "0 0 0 4px #592B2B20",
-                        }
-                      : done
-                      ? {
-                          bgcolor: "#0D8C47",
-                          color: "white",
-                        }
-                      : {
-                          bgcolor: "#f0f0f0",
-                          color: "#999",
-                        }),
-                  }}
-                  onClick={() => canNavigate && setStep(idx)}
-                >
-                  {done ? <Check size={16} /> : idx + 1}
-                </Box>
-
-                <Typography
-                  sx={{
-                    ml: 1,
-                    mr: idx < STEP_TITLES.length - 1 ? 1 : 0,
-                    fontSize: 14,
-                    fontWeight: active ? 600 : 400,
-                    color: active ? "#3A1A1A" : done ? "#0D8C47" : "#999",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {title}
-                </Typography>
-
-                {idx < STEP_TITLES.length - 1 && (
-                  <ChevronRight
-                    size={20}
-                    color={done || active ? "#592B2B" : "#ccc"}
-                    style={{ margin: "0 8px", opacity: 0.7 }}
-                  />
-                )}
-              </Box>
-            );
-          })}
-        </Box>
+        <WizardSteps step={step} />
       )}
 
-      {/* ============ CONTENIDO PRINCIPAL ============ */}
+      {isStepValid() ? renderContent() : <LoadingState text="Cargando..." />}
 
-      {/* Loader solo para rol almacén mientras no tiene sucursal cargada */}
-      {isAlmacen && !selectedSucursal ? (
-        <Box sx={{ textAlign: "center", py: 4 }}>
-          <CircularProgress sx={{ color: "#592B2B", mb: 2 }} />
-          <Typography variant="body2" color="text.secondary">
-            Cargando datos de tu sucursal y almacenes...
-          </Typography>
-        </Box>
-      ) : (
-        <>
-          {/* Paso 0: Seleccionar Ciudad (solo admin) */}
-          <Box
-            sx={{
-              display: !isAlmacen && step === 0 ? "block" : "none",
-            }}
-          >
-            <Typography variant="body2" color="text.secondary" mb={2}>
-              Selecciona la ciudad donde deseas ver los almacenes y movimientos.
-            </Typography>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              {ciudades.map((c) => {
-                const seleccionada = selectedCiudad?.id === c.id;
-                return (
-                  <Card
-                    key={c.id}
-                    variant="outlined"
-                    onClick={() => handleSelectCiudad(c)}
-                    sx={{
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                      "&:hover": {
-                        borderColor: "#592B2B",
-                        backgroundColor: "#592B2B08",
-                        transform: "translateY(-2px)",
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                      },
-                    }}
-                  >
-                    <Box sx={{ p: 2 }}>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 2,
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: "50%",
-                              bgcolor: seleccionada ? "#592B2B" : "#592B2B20",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <Building
-                              size={20}
-                              color={seleccionada ? "white" : "#592B2B"}
-                            />
-                          </Box>
-                          <Box sx={{ textAlign: "left" }}>
-                            <Typography
-                              fontSize={16}
-                              fontWeight={600}
-                              color="#3A1A1A"
-                            >
-                              {c.nombre || `Ciudad #${c.id}`}
-                            </Typography>
-                            {c.departamento && (
-                              <Typography
-                                fontSize={12}
-                                color="text.secondary"
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 0.5,
-                                }}
-                              >
-                                <MapPin size={12} />
-                                {c.departamento}
-                              </Typography>
-                            )}
-                          </Box>
-                        </Box>
-                        {seleccionada && (
-                          <Box
-                            sx={{
-                              width: 24,
-                              height: 24,
-                              borderRadius: "50%",
-                              bgcolor: "#592B2B",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <Check size={14} color="white" />
-                          </Box>
-                        )}
-                      </Box>
-                    </Box>
-                  </Card>
-                );
-              })}
-
-              {ciudades.length === 0 && (
-                <Box
-                  sx={{
-                    textAlign: "center",
-                    py: 4,
-                    border: "1px dashed #ccc",
-                    borderRadius: 2,
-                    bgcolor: "#fafafa",
-                  }}
-                >
-                  <Building size={32} color="#ccc" />
-                  <Typography variant="body2" color="text.disabled" mt={1}>
-                    No hay ciudades registradas
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-          </Box>
-
-          {/* Paso 1: Seleccionar Sucursal (solo admin) */}
-          <Box
-            sx={{
-              display: !isAlmacen && step === 1 ? "block" : "none",
-            }}
-          >
-            <Typography variant="body2" color="text.secondary" mb={2}>
-              Selecciona la sucursal de{" "}
-              <strong>{selectedCiudad?.nombre}</strong> para ver sus almacenes.
-            </Typography>
-
-            {loadingSucursales ? (
-              <Box sx={{ textAlign: "center", py: 4 }}>
-                <CircularProgress sx={{ color: "#592B2B", mb: 2 }} />
-                <Typography variant="body2" color="text.secondary">
-                  Cargando sucursales de {selectedCiudad?.nombre}...
-                </Typography>
-              </Box>
-            ) : (
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                {sucursales.map((s) => {
-                  const seleccionada = selectedSucursal?.id === s.id;
-                  return (
-                    <Card
-                      key={s.id}
-                      variant="outlined"
-                      onClick={() => handleSelectSucursal(s)}
-                      sx={{
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        "&:hover": {
-                          borderColor: "#3A1A1A",
-                          backgroundColor: "#3A1A1A08",
-                          transform: "translateY(-2px)",
-                          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                        },
-                      }}
-                    >
-                      <Box sx={{ p: 2 }}>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 2,
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                width: 40,
-                                height: 40,
-                                borderRadius: "50%",
-                                bgcolor: seleccionada
-                                  ? "#3A1A1A"
-                                  : "#3A1A1A20",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              <Store
-                                size={20}
-                                color={seleccionada ? "white" : "#3A1A1A"}
-                              />
-                            </Box>
-                            <Box sx={{ textAlign: "left" }}>
-                              <Typography
-                                fontSize={16}
-                                fontWeight={600}
-                                color="#3A1A1A"
-                              >
-                                {s.nombre}
-                              </Typography>
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 1,
-                                  flexWrap: "wrap",
-                                }}
-                              >
-                                <Typography
-                                  fontSize={12}
-                                  color="text.secondary"
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 0.5,
-                                  }}
-                                >
-                                  <MapPin size={12} />
-                                  {s.direccion || "Sin dirección"}
-                                </Typography>
-                                {s.telefono && (
-                                  <Typography
-                                    fontSize={12}
-                                    color="text.secondary"
-                                  >
-                                    • 📞 {s.telefono}
-                                  </Typography>
-                                )}
-                              </Box>
-                            </Box>
-                          </Box>
-                          {seleccionada && (
-                            <Box
-                              sx={{
-                                width: 24,
-                                height: 24,
-                                borderRadius: "50%",
-                                bgcolor: "#3A1A1A",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              <Check size={14} color="white" />
-                            </Box>
-                          )}
-                        </Box>
-                      </Box>
-                    </Card>
-                  );
-                })}
-
-                {sucursales.length === 0 && (
-                  <Box
-                    sx={{
-                      textAlign: "center",
-                      py: 4,
-                      border: "1px dashed #ccc",
-                      borderRadius: 2,
-                      bgcolor: "#fafafa",
-                    }}
-                  >
-                    <Store size={32} color="#ccc" />
-                    <Typography variant="body2" color="text.disabled" mt={1}>
-                      No hay sucursales disponibles en {selectedCiudad?.nombre}
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
-            )}
-          </Box>
-
-          {/* Paso 2: Seleccionar Almacén (admin y almacén) */}
-          <Box
-            sx={{
-              display: step === 2 ? "block" : "none",
-            }}
-          >
-            <Typography variant="body2" color="text.secondary" mb={2}>
-              Sucursal:{" "}
-              <strong>{selectedSucursal?.nombre || "Sin sucursal"}</strong>.
-              Selecciona un almacén para ver sus movimientos.
-            </Typography>
-
-            {loadingAlmacenes ? (
-              <Box sx={{ textAlign: "center", py: 4 }}>
-                <CircularProgress sx={{ color: "#592B2B", mb: 2 }} />
-                <Typography variant="body2" color="text.secondary">
-                  Cargando almacenes...
-                </Typography>
-              </Box>
-            ) : (
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                {almacenes.map((a) => {
-                  const seleccionada = selectedAlmacen?.id === a.id;
-                  return (
-                    <Card
-                      key={a.id}
-                      variant="outlined"
-                      onClick={() => handleSelectAlmacen(a)}
-                      sx={{
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        "&:hover": {
-                          borderColor: "#592B2B",
-                          backgroundColor: "#592B2B08",
-                          transform: "translateY(-2px)",
-                          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                        },
-                      }}
-                    >
-                      <Box sx={{ p: 2 }}>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 2,
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                width: 40,
-                                height: 40,
-                                borderRadius: "50%",
-                                bgcolor: seleccionada
-                                  ? "#592B2B"
-                                  : "#592B2B20",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              <Boxes
-                                size={20}
-                                color={seleccionada ? "white" : "#592B2B"}
-                              />
-                            </Box>
-                            <Box sx={{ textAlign: "left" }}>
-                              <Typography
-                                fontSize={16}
-                                fontWeight={600}
-                                color="#3A1A1A"
-                              >
-                                {a.nombre}
-                              </Typography>
-                              <Typography
-                                fontSize={12}
-                                color="text.secondary"
-                              >
-                                dirección: {a.direccion ?? "—"}
-                              </Typography>
-                            </Box>
-                          </Box>
-                          {seleccionada && (
-                            <Box
-                              sx={{
-                                width: 24,
-                                height: 24,
-                                borderRadius: "50%",
-                                bgcolor: "#592B2B",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              <Check size={14} color="white" />
-                            </Box>
-                          )}
-                        </Box>
-                      </Box>
-                    </Card>
-                  );
-                })}
-
-                {almacenes.length === 0 && (
-                  <Box
-                    sx={{
-                      textAlign: "center",
-                      py: 4,
-                      border: "1px dashed #ccc",
-                      borderRadius: 2,
-                      bgcolor: "#fafafa",
-                    }}
-                  >
-                    <Boxes size={32} color="#ccc" />
-                    <Typography variant="body2" color="text.disabled" mt={1}>
-                      No hay almacenes disponibles en esta sucursal
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
-            )}
-          </Box>
-
-          {/* Paso 3: Lista de movimientos */}
-          <Box
-            sx={{
-              display: step === 3 ? "block" : "none",
-            }}
-          >
-            {/* Card de Almacén */}
-            <Card
-              variant="outlined"
-              sx={{ mb: 3, bgcolor: "#592B2B08", borderColor: "#592B2B20" }}
-            >
-              <Box
-                sx={{
-                  p: 2,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                  <Box
-                    sx={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: "50%",
-                      bgcolor: "#592B2B20",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Boxes size={24} color="#592B2B" />
-                  </Box>
-                  <Box>
-                    <Typography
-                      variant="h6"
-                      fontWeight={700}
-                      color="#3A1A1A"
-                    >
-                      {selectedAlmacen?.nombre || "Almacén"}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      {selectedSucursal?.nombre && (
-                        <>
-                          <Store size={14} />
-                          <span>{selectedSucursal.nombre}</span>
-                        </>
-                      )}
-                      {selectedAlmacen?.direccion && (
-                        <>
-                          <span>•</span>
-                          <span>Dirección: {selectedAlmacen.direccion}</span>
-                        </>
-                      )}
-                      {isAlmacen && (
-                        <Typography
-                          component="span"
-                          sx={{
-                            color: "#0D8C47",
-                            bgcolor: "#0D8C4710",
-                            px: 1,
-                            py: 0.25,
-                            borderRadius: 1,
-                            fontSize: 11,
-                            ml: 1,
-                          }}
-                        >
-                          Mi almacén
-                        </Typography>
-                      )}
-                    </Typography>
-                  </Box>
-                </Box>
-
-                {canCreate && (
-                  <Button
-                    variant="contained"
-                    onClick={handleOpenNewMovimiento}
-                    startIcon={<Plus size={18} />}
-                    sx={{
-                      borderRadius: 2,
-                      px: 3,
-                      py: 1,
-                      fontWeight: 600,
-                      textTransform: "none",
-                      background:
-                        "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
-                      boxShadow: "0 4px 10px rgba(89,43,43,0.25)",
-                      "&:hover": {
-                        background:
-                          "linear-gradient(135deg, #3A1A1A 0%, #592B2B 100%)",
-                        boxShadow: "0 6px 16px rgba(89,43,43,0.35)",
-                      },
-                    }}
-                  >
-                    Nuevo movimiento
-                  </Button>
-                )}
-              </Box>
-            </Card>
-
-            {/* Tabla de movimientos */}
-            <Box sx={{ width: "100%", overflowX: "auto" }}>
-              <Box sx={{ minWidth: 600 }}>
-                <GridGenerico
-                  ref={gridRef}
-                  service={serviceMovimientoFiltrado}
-                  columns={columns}
-                  defaultSortField="fecha"
-                  defaultSortAsc={false}
-                  pageSize={10}
-                  title="Movimientos"
-                  renderActions={(row) => (
-                    <Box
-                      sx={{
-                        display: "flex",
-                        gap: 1,
-                        justifyContent: "flex-end",
-                      }}
-                    >
-                      <IconButton
-                        size="small"
-                        onClick={() => handleOpenDetails(row.id)}
-                        sx={{ color: "#592B2B" }}
-                        title="Ver detalles"
-                      >
-                        <Eye size={16} />
-                      </IconButton>
-
-                      {canDelete && (
-                        <IconButton
-                          size="small"
-                          onClick={() => setIdToDelete(row.id)}
-                          sx={{ color: "#d32f2f" }}
-                          title="Eliminar movimiento"
-                        >
-                          <Trash size={16} />
-                        </IconButton>
-                      )}
-                    </Box>
-                  )}
-                />
-              </Box>
-            </Box>
-          </Box>
-        </>
-      )}
-
-      {/* Modales */}
-      <Details
+      <MovimientoDetalleDialog
         open={!!selectedId}
         id={selectedId}
-        fetchData={ServiceMovimiento.getById}
-        fields={detailsFields}
         onClose={() => setSelectedId(null)}
+      />
+
+      <MovimientoEditDialog
+        open={!!editId}
+        id={editId}
+        onClose={() => setEditId(null)}
+        onSuccess={() => {
+          setEditId(null);
+          if (gridRef.current) {
+            gridRef.current.refetch?.();
+          }
+        }}
       />
 
       {idToDelete && (
@@ -1785,12 +972,16 @@ const MovimientoList = () => {
         />
       )}
 
+      <ErrorDialog open={showError} message={errorMessage} />
+
       {showInventarioFlow && (
         <InventarioFlow
           isOpen={showInventarioFlow}
           onClose={() => {
             setShowInventarioFlow(false);
-            gridRef.current?.refetch();
+            if (gridRef.current) {
+              gridRef.current.refetch?.();
+            }
           }}
           usuarioId={usuarioIdLogueado}
           sucursalSeleccionada={selectedSucursal}
@@ -1799,7 +990,106 @@ const MovimientoList = () => {
       )}
     </Box>
   );
-
 };
+
+const LoadingState = ({ text }) => (
+  <Box sx={{ textAlign: "center", py: 4 }}>
+    <CircularProgress sx={{ color: "#592B2B", mb: 2 }} />
+    <Typography variant="body2" color="text.secondary">
+      {text}
+    </Typography>
+  </Box>
+);
+
+const EmptyState = ({ icon, text }) => (
+  <Box
+    sx={{
+      textAlign: "center",
+      py: 4,
+      border: "1px dashed #ccc",
+      borderRadius: 2,
+      bgcolor: "#fafafa",
+      color: "#999",
+    }}
+  >
+    {icon}
+    <Typography variant="body2" color="text.disabled" mt={1}>
+      {text}
+    </Typography>
+  </Box>
+);
+
+const WizardSteps = ({ step }) => (
+  <Box
+    sx={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      mb: 4,
+      gap: 1,
+      flexWrap: "wrap",
+    }}
+  >
+    {STEP_TITLES.map((title, index) => {
+      const active = step === index;
+      const done = step > index;
+
+      return (
+        <Box key={title} sx={{ display: "flex", alignItems: "center" }}>
+          <Box
+            sx={{
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontWeight: 700,
+              fontSize: 14,
+              ...(active
+                ? {
+                    bgcolor: "#592B2B",
+                    color: "white",
+                    boxShadow: "0 0 0 4px #592B2B20",
+                  }
+                : done
+                ? {
+                    bgcolor: "#0D8C47",
+                    color: "white",
+                  }
+                : {
+                    bgcolor: "#f0f0f0",
+                    color: "#999",
+                  }),
+            }}
+          >
+            {done ? <Check size={16} /> : index + 1}
+          </Box>
+
+          <Typography
+            sx={{
+              ml: 1,
+              mr: index < STEP_TITLES.length - 1 ? 1 : 0,
+              fontSize: 14,
+              fontWeight: active ? 700 : 400,
+              color: active ? "#3A1A1A" : done ? "#0D8C47" : "#999",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {title}
+          </Typography>
+
+          {index < STEP_TITLES.length - 1 && (
+            <ChevronRight
+              size={20}
+              color={done || active ? "#592B2B" : "#ccc"}
+              style={{ margin: "0 8px", opacity: 0.7 }}
+            />
+          )}
+        </Box>
+      );
+    })}
+  </Box>
+);
 
 export default MovimientoList;

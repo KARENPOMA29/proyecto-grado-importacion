@@ -1,7 +1,7 @@
 import { Dialog, Box, Typography, Fade } from "@mui/material";
-import { CheckCircle } from "lucide-react";
+import { XCircle } from "lucide-react";
 
-const SuccessDialog = ({ open, message }) => {
+const ErrorDialog = ({ open, message }) => {
   return (
     <Dialog
       open={open}
@@ -23,7 +23,7 @@ const SuccessDialog = ({ open, message }) => {
               width: 92,
               height: 92,
               borderRadius: "50%",
-              bgcolor: "#14AE5C15",
+              bgcolor: "#EF444415",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -31,11 +31,11 @@ const SuccessDialog = ({ open, message }) => {
               mb: 2,
             }}
           >
-            <CheckCircle size={58} color="#14AE5C" />
+            <XCircle size={58} color="#EF4444" />
           </Box>
 
           <Typography variant="h5" fontWeight={900} sx={{ color: "#1F2937", mb: 1 }}>
-            ¡Registrado!
+            Error
           </Typography>
 
           <Typography variant="body1" sx={{ color: "#6B7280", fontSize: 15 }}>
@@ -47,4 +47,4 @@ const SuccessDialog = ({ open, message }) => {
   );
 };
 
-export default SuccessDialog;
+export default ErrorDialog;

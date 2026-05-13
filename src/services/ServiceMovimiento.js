@@ -55,6 +55,28 @@ const getById = async (id) => {
     );
   }
 };
+const getDetalle = async (id) => {
+  try {
+    const { data } = await api.get(`${BASE}/${id}/detalle`);
+    return data;
+  } catch (err) {
+    console.error("❌ Error detalle movimiento:", err?.response?.data);
+    throw new Error(
+      err?.response?.data?.detail || "No se pudo cargar el detalle del movimiento"
+    );
+  }
+};
+const updateDetalle = async (id, payload) => {
+  try {
+    const { data } = await api.put(`${BASE}/${id}/detalle`, payload);
+    return data;
+  } catch (err) {
+    console.error("❌ Error al actualizar detalle:", err?.response?.data);
+    throw new Error(
+      err?.response?.data?.detail || "No se pudo actualizar el movimiento"
+    );
+  }
+};
 
 const create = async (payload) => {
   try {
@@ -92,5 +114,5 @@ const remove = async (id) => {
   }
 };
 
-const ServiceMovimiento = { getAll, getById, create, update, remove };
+const ServiceMovimiento = { getAll, getById, getDetalle, create, update, remove, updateDetalle };
 export default ServiceMovimiento;
