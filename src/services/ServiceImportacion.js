@@ -162,6 +162,25 @@ const getByEmpleado = async (empleadoId) => {
   const { data } = await api.get(`${BASE}/empleado/${empleadoId}`);
   return Array.isArray(data) ? data : data.items || data;
 };
+const getConcluidas = async (params = {}) => {
+  const { search = "", page = 1, pageSize = 1000 } = params;
 
-const ServiceImportacion = { getAll, getById, create, update, remove, getByEmpleado, getControl };
+  const { data } = await api.get(`${BASE}/concluidas`, {
+    params: {
+      search: search || undefined,
+      page,
+      pageSize,
+    },
+  });
+
+  if (Array.isArray(data)) {
+    return { items: data, total: data.length };
+  }
+
+  return {
+    items: data.items || [],
+    total: data.total || 0,
+  };
+};
+const ServiceImportacion = { getAll, getById, create, update, remove, getByEmpleado, getControl, getConcluidas };
 export default ServiceImportacion;

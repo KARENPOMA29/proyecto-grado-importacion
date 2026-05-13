@@ -1,58 +1,84 @@
-// src/routes/pages/ventas/VentaForm.jsx
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  TextField,
-  Grid,
   Alert,
-  Typography,
-  IconButton,
-  Autocomplete,
+  Avatar,
   Box,
-  Card,
+  Button,
   CardContent,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
+  Grid,
+  TextField,
+  Typography,
+  Autocomplete,
 } from "@mui/material";
+import {
+  Dialog as MuiDialog,
+  DialogTitle as MuiDialogTitle,
+  DialogContent as MuiDialogContent,
+  DialogActions as MuiDialogActions,
+} from "@mui/material";
+import { createFilterOptions } from "@mui/material/Autocomplete";
 import { toast } from "react-toastify";
-import { Plus, Trash2, ShoppingCart, MapPin, Phone } from "lucide-react";
+import {
+  AlertCircle,
+  Barcode,
+  Phone,
+  Plus,
+  Receipt,
+  Store,
+  User,
+  Package,
+} from "lucide-react";
 
-import ServiceVentas from "@/services/ServiceVentas";
 import ServiceProducto from "@/services/ServiceProducto";
+import ServiceVentas from "@/services/ServiceVentas";
 import ServiceCliente from "@/services/ServiceCliente";
 import ServiceSucursal from "@/services/ServiceSucursal";
+import ClienteForm from "@/routes/pages/clientes/ClienteForm";
 import { useAuth } from "@/context/AuthContext";
 import BarcodeListener from "@/components/BarcodeListener";
-import { createFilterOptions } from "@mui/material/Autocomplete";
+import SuccessDialog from "@/components/SuccessDialog";
 
-import Comprobante from "./Comprobante";
+import {
+  Badge,
+  MotionCard,
+  ProductRow,
+  VentaResumen,
+  brand,
+  comboSx,
+  readonlyInputSx,
+  sxCard,
+  sxLabel,
+  sxSectionTitle,
+} from "./VentaFormUI";
 
 const VentasForm = ({
   onClose,
   onSuccess,
   initialData = null,
-  // 👇 opcional: la sucursal seleccionada en el wizard de VentasList
   sucursalPreseleccionada = null,
 }) => {
   const { user } = useAuth();
-  const empleadoId = user?.id || 1;
 
-  // ===== ROL DEL USUARIO =====
-  const rawRoleKey =
+  const empleadoId = user?.id || 1;
+  const roleKey = (
     user?.rol ||
     user?.role ||
     user?.perfil?.rol ||
     user?.perfil?.nombre ||
-    "";
-  const roleKey = rawRoleKey.toString().trim().toLowerCase();
+    ""
+  )
+    .toString()
+    .trim()
+    .toLowerCase();
+
   const isAdmin = roleKey === "administrador";
-  const isVentas = roleKey === "ventas";
   const empleadoSucursalId = user?.idSucursal ?? null;
 
-  // ===== STATE PRINCIPAL =====
   const [form, setForm] = useState({
     empleadoId,
     clienteId: "",
@@ -75,118 +101,126 @@ const VentasForm = ({
   const [clientes, setClientes] = useState([]);
   const [sucursales, setSucursales] = useState([]);
   const [productos, setProductos] = useState([]);
-  const [formError, setFormError] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
-  const [activeDetalle, setActiveDetalle] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [activeDetalle, setActiveDetalle] = useState(0);
 
-  const [showResumen, setShowResumen] = useState(false);
-  const [ventaResumen, setVentaResumen] = useState(null);
+  const [showClienteForm, setShowClienteForm] = useState(false);
 
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [showVentaForm, setShowVentaForm] = useState(true);
+  const [showSuccess, setShowSuccess] = useState(false);
   const productoInputRef = useRef(null);
 
   const filterClientes = createFilterOptions({
-    stringify: (option) => {
-      const nit = option.nit || "";
-      const razonSocial = option.razonSocial || "";
-      const telefono = option.telefono || option.celular || "";
-      return `${nit} ${razonSocial} ${telefono}`;
-    },
+    stringify: (option) =>
+      `${option.nit || ""} ${option.razonSocial || ""} ${
+        option.telefono || option.celular || ""
+      } ${option.correo || ""}`,
   });
 
-  // ===== CARGAR DATOS BASE =====
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoadingData(true);
-        const [cliRes, sucRes, prodRes] = await Promise.all([
-          ServiceCliente.getAll(),
+
+        const [cliRes, sucRes] = await Promise.all([
+          ServiceCliente.getAll({ page: 1, pageSize: 1000 }),
           ServiceSucursal.getAll(),
-          ServiceProducto.getDisponibles(),
         ]);
 
-        const cliData = Array.isArray(cliRes) ? cliRes : cliRes.items || [];
-        const sucData = Array.isArray(sucRes) ? sucRes : sucRes.items || [];
-        const prodData = Array.isArray(prodRes) ? prodRes : prodRes.items || [];
-
-        setClientes(cliData);
-        setSucursales(sucData);
-        setProductos(prodData);
+        setClientes(Array.isArray(cliRes) ? cliRes : cliRes.items || []);
+        setSucursales(Array.isArray(sucRes) ? sucRes : sucRes.items || []);
       } catch (err) {
-        console.error(err);
-        toast.error("Error al cargar datos iniciales: " + (err.message || err));
+        toast.error("Error al cargar datos: " + (err.message || err));
       } finally {
         setLoadingData(false);
       }
     };
+
     loadData();
   }, []);
 
-  // ===== SUCURSAL DEL EMPLEADO (OBJETO) =====
-  const sucursalEmpleado = useMemo(
-    () =>
-      sucursales.find(
-        (s) => Number(s.id) === Number(empleadoSucursalId || 0)
-      ) || null,
-    [sucursales, empleadoSucursalId]
+  useEffect(() => {
+    const cargarProductos = async () => {
+      const sucursalId =
+        sucursalPreseleccionada?.id || form.sucursalId || empleadoSucursalId;
+
+      if (!sucursalId) {
+        setProductos([]);
+        setDetalles([{ productoId: "", subtotal: 0 }]);
+        return;
+      }
+
+      try {
+        setLoadingData(true);
+        setProductos([]);
+        setDetalles([{ productoId: "", subtotal: 0 }]);
+        setActiveDetalle(0);
+
+        const data = await ServiceProducto.getDisponiblesPorSucursal(sucursalId);
+        setProductos(Array.isArray(data) ? data : data.items || []);
+      } catch {
+        toast.error("Error al cargar productos");
+        setProductos([]);
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    cargarProductos();
+  }, [sucursalPreseleccionada?.id, form.sucursalId, empleadoSucursalId]);
+
+  const sucursalActual = useMemo(() => {
+    return (
+      sucursalPreseleccionada ||
+      sucursales.find((s) => Number(s.id) === Number(form.sucursalId || 0)) ||
+      sucursales.find((s) => Number(s.id) === Number(empleadoSucursalId || 0)) ||
+      null
+    );
+  }, [sucursalPreseleccionada, sucursales, form.sucursalId, empleadoSucursalId]);
+
+  const clienteSeleccionado = useMemo(
+    () => clientes.find((c) => Number(c.id) === Number(form.clienteId)) || null,
+    [clientes, form.clienteId]
   );
 
-  // 👇 Sucursal actual mostrada en cabecera y resumen (admin o ventas)
-  const sucursalActual = useMemo(() => {
-    if (isAdmin) {
-      return (
-        sucursales.find(
-          (s) => Number(s.id) === Number(form.sucursalId || 0)
-        ) || sucursalPreseleccionada || null
-      );
-    }
-    return sucursalEmpleado;
-  }, [isAdmin, sucursales, form.sucursalId, sucursalEmpleado, sucursalPreseleccionada]);
-
-  // ===== Auto-seleccionar sucursal al cargar (sin pisar cambios manuales) =====
-  useEffect(() => {
-    // solo si aún no hay sucursal en el form
-    if (form.sucursalId) return;
-
-    if (initialData?.sucursalId) {
-      setForm((prev) => ({ ...prev, sucursalId: initialData.sucursalId }));
-      return;
-    }
-
-    if (isAdmin && sucursalPreseleccionada?.id) {
-      setForm((prev) => ({ ...prev, sucursalId: sucursalPreseleccionada.id }));
-      return;
-    }
-
-    if (!isAdmin && empleadoSucursalId) {
-      setForm((prev) => ({ ...prev, sucursalId: empleadoSucursalId }));
-    }
-  }, [
-    form.sucursalId,
-    initialData?.sucursalId,
-    isAdmin,
-    sucursalPreseleccionada,
-    empleadoSucursalId,
-  ]);
-
-  // TOTAL siempre numérico
   const total = useMemo(
-    () =>
-      detalles.reduce(
-        (acc, d) => acc + (Number(d.subtotal) || 0),
-        0
-      ),
+    () => detalles.reduce((acc, d) => acc + (Number(d.subtotal) || 0), 0),
     [detalles]
+  );
+
+  const detallesResumen = useMemo(
+    () =>
+      detalles
+        .filter((d) => d.productoId && Number(d.subtotal) > 0)
+        .map((d) => {
+          const prod = productos.find(
+            (p) => Number(p.id) === Number(d.productoId)
+          );
+
+          if (!prod) return null;
+
+          return {
+            prod,
+            det: d,
+            base: Number(prod.precioOrigen ?? prod.precio ?? 0),
+          };
+        })
+        .filter(Boolean),
+    [detalles, productos]
   );
 
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+    setFormError("");
   };
 
   const addDetalle = () => {
-    const cantidadSeleccionados = detalles.filter((d) => d.productoId).length;
-    if (cantidadSeleccionados >= productos.length) {
+    if (detalles.filter((d) => d.productoId).length >= productos.length) {
       toast.info("Ya seleccionaste todos los productos disponibles.");
       return;
     }
@@ -200,146 +234,146 @@ const VentasForm = ({
     if (activeDetalle === idx) setActiveDetalle(0);
   };
 
-  // ===== VALIDACIÓN =====
   const validateForm = () => {
     if (!form.clienteId) return "Seleccione un cliente";
 
-    if (isAdmin) {
-      if (!form.sucursalId) return "Seleccione una sucursal";
-    } else if (isVentas) {
-      if (!empleadoSucursalId) {
-        return "Su usuario no tiene una sucursal asignada. Contacte al administrador.";
-      }
-    }
+    const sucursalIdActual =
+      sucursalPreseleccionada?.id || form.sucursalId || empleadoSucursalId;
+
+    if (!sucursalIdActual) return "No se encontró una sucursal seleccionada.";
 
     const ok = detalles.filter(
       (d) => d.productoId !== "" && Number(d.subtotal) > 0
     );
+
     if (!ok.length) return "Agregue al menos un producto";
 
-    // ⭐ Validar que no haya productos repetidos
     const ids = ok.map((d) => d.productoId);
-    const unique = new Set(ids);
-    if (unique.size !== ids.length) {
-      return "Hay productos repetidos en el detalle. Cada producto solo puede venderse una vez por venta.";
+
+    if (new Set(ids).size !== ids.length) {
+      return "Hay productos repetidos en el detalle.";
     }
 
-    // ⭐ Validar que el precio sea mayor al origen, no cero, no negativo y no exagerado
-  for (const d of ok) {
-    const prod = productos.find(
-      (p) => Number(p.id) === Number(d.productoId)
-    );
-    if (!prod) continue;
+    for (const d of ok) {
+      const prod = productos.find(
+        (p) => Number(p.id) === Number(d.productoId)
+      );
 
-    const base = Number(prod.precioOrigen ?? prod.precio ?? 0);
-    const precio = Number(d.subtotal || 0);
-    const etiquetaProd = prod.numeroSerie || prod.descripcion || "producto";
+      if (!prod) continue;
 
-    if (precio <= 0) {
-      return `El producto ${etiquetaProd} no puede tener precio 0 ni negativo.`;
+      const base = Number(prod.precioOrigen ?? prod.precio ?? 0);
+      const precio = Number(d.subtotal || 0);
+      const etiqueta = prod.numeroSerie || prod.descripcion || "producto";
+
+      if (precio <= 0) {
+        return `El producto ${etiqueta} no puede tener precio 0 o negativo.`;
+      }
+
+      if (precio <= base) {
+        return `El producto ${etiqueta} debe superar el precio origen (Bs ${base.toFixed(
+          2
+        )}).`;
+      }
+
+      if (precio > (base > 0 ? base * 10 : 100000)) {
+        return `El precio de ${etiqueta} es demasiado alto.`;
+      }
     }
-
-    if (precio <= base) {
-      return `El producto ${etiquetaProd} debe tener un precio mayor al precio de origen (Bs ${base.toFixed(
-        2
-      )}).`;
-    }
-
-    const maxRazonable = base > 0 ? base * 10 : 100000;
-
-    if (precio > maxRazonable) {
-      return `El precio del producto ${etiquetaProd} es demasiado alto. Verifique el monto ingresado.`;
-    }
-  }
-
-
-
 
     return "";
   };
 
-  const handleSubmit = async () => {
-    // 👇 si ya está guardando, no hagas nada
-    if (loading) return;
+const handleSubmit = async () => {
+  if (loading) return;
 
-    setSubmitted(true);
+  setLoading(true);
+  setFormError("");
 
-    const err = validateForm();
-    if (err) {
-      setFormError(err);
-      return;
+  const err = validateForm();
+  if (err) {
+    setFormError(err);
+    toast.error(err);
+    setShowConfirm(false);
+    setLoading(false);
+    return;
+  }
+
+  const sucursalIdToSend =
+    sucursalPreseleccionada?.id || form.sucursalId || empleadoSucursalId;
+
+  const payload = {
+    ...form,
+    empleadoId: Number(empleadoId),
+    clienteId: Number(form.clienteId),
+    sucursalId: Number(sucursalIdToSend),
+    detalles: detalles
+      .filter((d) => d.productoId !== "" && Number(d.subtotal) > 0)
+      .map((d) => ({
+        productoId: Number(d.productoId),
+        subtotal: Number(d.subtotal),
+      })),
+  };
+
+  try {
+    setShowConfirm(false);
+
+    const response = await ServiceVentas.create(payload);
+
+    let ventaDetallada = response;
+
+    if (response?.id) {
+      ventaDetallada = await ServiceVentas.getById(response.id);
     }
 
-    setLoading(true);
-    setFormError("");
-
-    const sucursalIdToSend = isAdmin ? form.sucursalId : empleadoSucursalId;
-
-    const payload = {
-      ...form,
-      empleadoId: Number(empleadoId),
-      clienteId: Number(form.clienteId),
-      sucursalId: Number(sucursalIdToSend),
-      detalles: detalles
-        .filter((d) => d.productoId !== "" && Number(d.subtotal) > 0)
-        .map((d) => ({
-          productoId: Number(d.productoId),
-          subtotal: Number(d.subtotal),
-        })),
+    const ventaParaComprobante = {
+      ...ventaDetallada,
+      empleado: ventaDetallada?.empleado || user,
+      cliente: ventaDetallada?.cliente || clienteSeleccionado,
+      sucursal: ventaDetallada?.sucursal || sucursalActual,
+      detalles: Array.isArray(ventaDetallada?.detalles)
+        ? ventaDetallada.detalles
+        : payload.detalles,
     };
 
-    try {
-      const response = await ServiceVentas.create(payload);
-      const ventaDetallada = await ServiceVentas.getById(response.id);
+    setShowSuccess(true);
 
-      setVentaResumen({
-        ...ventaDetallada,
-        empleado: user,
-      });
+    setTimeout(() => {
+      setShowSuccess(false);
+      onSuccess?.(ventaParaComprobante);
+    }, 1400);
+  } catch (err) {
+    const msg =
+      err?.response?.data?.detail ||
+      err?.message ||
+      "Error al registrar la venta";
 
-      setShowResumen(true);
-      toast.success("Venta registrada correctamente");
-    } catch (err) {
-      console.error(err);
-      const msg =
-        err.response?.data?.detail ||
-        err.message ||
-        "Error al registrar la venta";
-      setFormError(msg);
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
-  const handleCloseResumen = () => {
-    setShowResumen(false);
-    onSuccess?.();
-    onClose();
-  };
-
-  // ===== SCANNER =====
+    setFormError(msg);
+    toast.error(msg);
+    setShowConfirm(false);
+  } finally {
+    setLoading(false);
+  }
+};
   const handleScan = (code) => {
     if (!code) return;
+
     const producto = productos.find(
       (p) => String(p.numeroSerie) === String(code)
     );
+
     if (!producto) {
       toast.error("Producto no encontrado");
       return;
     }
 
-    const yaSeleccionado = detalles.some(
-      (d) => Number(d.productoId) === Number(producto.id)
-    );
-    if (yaSeleccionado) {
-      toast.error("Este producto ya está seleccionado en la venta.");
+    if (detalles.some((d) => Number(d.productoId) === Number(producto.id))) {
+      toast.error("Producto ya seleccionado");
       return;
     }
 
     setDetalles((prev) => {
       const copy = [...prev];
+
       if (activeDetalle !== null && copy[activeDetalle]) {
         copy[activeDetalle] = {
           productoId: producto.id,
@@ -351,96 +385,82 @@ const VentasForm = ({
           subtotal: Number(producto.precio),
         });
       }
+
       return copy;
     });
 
     toast.success(`Producto ${producto.numeroSerie} agregado`);
   };
 
-  const clienteSeleccionado = clientes.find(
-    (c) => Number(c.id) === Number(form.clienteId)
-  );
+  const renderClienteOption = (props, option) => {
+    const { key, ...optionProps } = props;
 
-  // ===== precio editable con validación (no < precio base) =====
-  const handlePrecioChange = (idx, value) => {
-    const num = Number(value);
-    setDetalles((prev) =>
-      prev.map((item, i) =>
-        i === idx ? { ...item, subtotal: isNaN(num) ? 0 : num } : item
-      )
+    return (
+      <Box
+        component="li"
+        key={key}
+        {...optionProps}
+        sx={{
+          py: 1.1,
+          px: 1.5,
+          display: "flex",
+          alignItems: "center",
+          gap: 1.4,
+        }}
+      >
+        <Avatar
+          sx={{
+            width: 34,
+            height: 34,
+            bgcolor: brand[600],
+            fontSize: 13,
+            fontWeight: 900,
+            flexShrink: 0,
+          }}
+        >
+          {(option.razonSocial || "C")[0]}
+        </Avatar>
+
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            sx={{
+              fontWeight: 900,
+              fontSize: 13.5,
+              color: "#1F2937",
+            }}
+            noWrap
+          >
+            {option.razonSocial || "Cliente"}
+          </Typography>
+
+          <Typography sx={{ fontSize: 12, color: "#6B7280" }} noWrap>
+            NIT: {option.nit || "—"} · Tel:{" "}
+            {option.telefono || option.celular || "—"}
+          </Typography>
+        </Box>
+      </Box>
     );
   };
 
-  const handlePrecioBlur = (idx) => {
-    setDetalles((prev) => {
-      const copy = [...prev];
-      const det = copy[idx];
-      if (!det || !det.productoId) return prev;
-
-      const prod = productos.find(
-        (p) => Number(p.id) === Number(det.productoId)
-      );
-      if (!prod) return prev;
-
-      const base = Number(prod.precioOrigen ?? prod.precio ?? 0);
-      let valor = Number(det.subtotal);
-
-      // Caso 1: precio vacío, NaN, negativo o cero → corregir a base
-      if (!valor || valor <= 0) {
-        toast.warn(
-          `El precio no puede ser 0 o negativo. Se ajustó al mínimo permitido Bs ${(
-            base + 0.01
-          ).toFixed(2)}`
-        );
-        valor = base + 0.01; // siempre mayor al origen
-      }
-
-      // Caso 2: precio <= base → corregir
-      if (valor <= base) {
-        toast.warn(
-          `Debe ser mayor al precio de origen (Bs ${base.toFixed(2)}).`
-        );
-        valor = base + 0.01;
-      }
-
-      const maxRazonable = base > 0 ? base * 10 : 100000;
-
-      // Caso 3: demasiado alto
-      if (valor > maxRazonable) {
-        toast.warn(
-          `El precio es muy alto. Se ajustó al máximo Bs ${maxRazonable.toFixed(
-            2
-          )}.`
-        );
-        valor = maxRazonable;
-      }
-
-      copy[idx] = { ...det, subtotal: valor };
-      return copy;
-    });
-  };
-
-
-
-  // ===== producto destacado para el resumen lateral =====
-  const detallesResumen = useMemo(
-    () =>
-      detalles
-        .filter((d) => d.productoId && Number(d.subtotal) > 0)
-        .map((d) => {
-          const prod = productos.find(
-            (p) => Number(p.id) === Number(d.productoId)
-          );
-          if (!prod) return null;
-          const base = Number(prod.precioOrigen ?? prod.precio ?? 0);
-          return { prod, det: d, base };
-        })
-        .filter(Boolean),
-    [detalles, productos]
-  );
   return (
     <>
-      <Dialog open={true} onClose={onClose} maxWidth="xl" fullWidth>
+      <Dialog
+        open={showVentaForm}
+        onClose={onClose}
+        maxWidth="xl"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: { xs: 0, sm: 4 },
+            overflow: "hidden",
+            bgcolor: "#F8F3F3",
+            backgroundImage:
+              "radial-gradient(circle at 100% 0%, #F5EAEA 0%, transparent 45%)",
+            height: { xs: "100dvh", sm: "92vh" },
+            maxHeight: { xs: "100dvh", sm: "92vh" },
+          },
+        }}
+      >
         <BarcodeListener
           onScan={handleScan}
           targetRef={productoInputRef}
@@ -450,121 +470,227 @@ const VentasForm = ({
           autoLength={13}
         />
 
-        <DialogTitle sx={{ fontWeight: 600, fontSize: 18, pb: 1 }}>
-          Nueva venta
-        </DialogTitle>
-
-        <DialogContent sx={{ pt: 1 }}>
-          {/* CABECERA SUCURSAL */}
-          <Card
-            variant="outlined"
+        <DialogTitle
+          sx={{
+            px: { xs: 2, md: 3.5 },
+            py: 0,
+            background: `linear-gradient(135deg, ${brand[900]} 0%, ${brand[600]} 100%)`,
+            color: "white",
+            position: "relative",
+            overflow: "hidden",
+            flexShrink: 0,
+          }}
+        >
+          <Box
             sx={{
-              mb: 3,
-              borderRadius: 3,
-              borderColor: "#f1d2d2",
-              bgcolor: "#fdf5f5",
+              position: "absolute",
+              top: -45,
+              right: -35,
+              width: 160,
+              height: 160,
+              borderRadius: "50%",
+              bgcolor: "rgba(255,255,255,0.06)",
+              pointerEvents: "none",
+            }}
+          />
+
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              py: 2,
+              gap: 2,
             }}
           >
-            <CardContent
-              sx={{
-                py: 1.5,
-                display: "flex",
-                alignItems: "center",
-                gap: 2,
-              }}
-            >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.7 }}>
               <Box
                 sx={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: "50%",
-                  bgcolor: "#592B2B15",
+                  width: 48,
+                  height: 48,
+                  borderRadius: 2.5,
+                  bgcolor: "rgba(255,255,255,0.12)",
+                  border: "1px solid rgba(255,255,255,0.2)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "#592B2B",
+                  backdropFilter: "blur(4px)",
+                  flexShrink: 0,
                 }}
               >
-                <ShoppingCart size={22} />
+                <Receipt size={23} />
               </Box>
-              <Box sx={{ flex: 1 }}>
+
+              <Box>
                 <Typography
-                  variant="subtitle2"
-                  sx={{ fontWeight: 700, color: "#3A1A1A" }}
-                >
-                  {sucursalActual?.nombre || "Sucursal no seleccionada"}
-                </Typography>
-                <Typography
-                  variant="body2"
                   sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
-                    color: "text.secondary",
-                    mt: 0.5,
+                    fontWeight: 900,
+                    fontSize: { xs: 18, md: 21 },
+                    lineHeight: 1.1,
                   }}
                 >
-                  <MapPin size={14} />
-                  {sucursalActual?.direccion || "Sin dirección"}
-                  {sucursalActual?.telefono && (
-                    <>
-                      <span>•</span>
-                      <span style={{ display: "flex", alignItems: "center" }}>
-                        <Phone size={14} style={{ marginRight: 4 }} />
-                        {sucursalActual.telefono}
-                      </span>
-                    </>
-                  )}
+                  Nueva Venta
+                </Typography>
+
+                <Typography sx={{ fontSize: 12.5, opacity: 0.75, mt: 0.2 }}>
+                  Registro de venta ·{" "}
+                  {sucursalActual?.nombre || "Selecciona sucursal"}
                 </Typography>
               </Box>
-            </CardContent>
-          </Card>
+            </Box>
 
-          {/* LAYOUT 2 COLUMNAS: IZQ FORM, DER RESUMEN */}
-          <Grid container spacing={3}>
-            {/* COLUMNA IZQUIERDA */}
-            <Grid item xs={12} md={8.5}>
-              {/* INFORMACIÓN DE LA VENTA */}
-              <Card variant="outlined" sx={{ mb: 3 }}>
-                <CardContent>
-                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                    Información de la venta
+            {sucursalActual && (
+              <Box
+                sx={{
+                  display: { xs: "none", sm: "flex" },
+                  alignItems: "center",
+                  gap: 0.8,
+                  px: 2,
+                  py: 0.8,
+                  borderRadius: 99,
+                  bgcolor: "rgba(255,255,255,0.12)",
+                  border: "1px solid rgba(255,255,255,0.22)",
+                  fontSize: 12.5,
+                  fontWeight: 800,
+                  maxWidth: 430,
+                }}
+              >
+                <Store size={14} />
+
+                <Box component="span" sx={{ whiteSpace: "nowrap" }}>
+                  {sucursalActual.nombre}
+                </Box>
+
+                {sucursalActual.direccion && (
+                  <Typography
+                    component="span"
+                    sx={{
+                      fontSize: 11,
+                      opacity: 0.78,
+                      ml: 0.5,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    · {sucursalActual.direccion}
                   </Typography>
+                )}
+              </Box>
+            )}
+          </Box>
+        </DialogTitle>
+
+        <DialogContent
+          sx={{
+            p: { xs: 2, md: 3 },
+            bgcolor: "transparent",
+            overflowY: "auto",
+            pb: { xs: 12, md: 3 },
+          }}
+        >
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                lg: "minmax(0, 1fr) 370px",
+              },
+              gap: 3,
+              alignItems: "start",
+            }}
+          >
+            <Box sx={{ display: "grid", gap: 2.5, minWidth: 0 }}>
+              <MotionCard
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+                sx={sxCard}
+              >
+                <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      mb: 2.5,
+                      gap: 1,
+                    }}
+                  >
+                    <Typography sx={sxSectionTitle}>
+                      <User size={16} />
+                      Información de la venta
+                    </Typography>
+
+                    <Badge color={brand[500]}>Paso 1</Badge>
+                  </Box>
+
                   <Grid container spacing={2}>
-                    {/* EMPLEADO */}
-                    <Grid item xs={12} md={4}>
+                    <Grid size={{ xs: 12, md: 3 }}>
+                      <Typography sx={sxLabel}>Empleado</Typography>
+
                       <TextField
-                        label="Empleado"
                         value={
                           user?.nombreCompleto || user?.nombre || "Empleado"
                         }
                         fullWidth
                         size="small"
-                        InputProps={{ readOnly: true }}
+                        InputProps={{
+                          readOnly: true,
+                          startAdornment: (
+                            <Box sx={{ mr: 1, color: "#9CA3AF" }}>
+                              <User size={14} />
+                            </Box>
+                          ),
+                        }}
+                        sx={readonlyInputSx}
                       />
                     </Grid>
 
-                    {/* CLIENTE */}
-                    <Grid item xs={12} md={4}>
+                    <Grid size={{ xs: 12, md: 3 }}>
+                      <Typography sx={sxLabel}>Sucursal</Typography>
+
+                      <TextField
+                        value={sucursalActual?.nombre || "Sin sucursal"}
+                        fullWidth
+                        size="small"
+                        InputProps={{
+                          readOnly: true,
+                          startAdornment: (
+                            <Box sx={{ mr: 1, color: "#9CA3AF" }}>
+                              <Store size={14} />
+                            </Box>
+                          ),
+                        }}
+                        sx={readonlyInputSx}
+                      />
+                    </Grid>
+
+                    <Grid size={{ xs: 12, md: 4.2 }}>
+                      <Typography sx={sxLabel}>Cliente *</Typography>
+
                       <Autocomplete
                         options={clientes}
-                        getOptionLabel={(c) => {
-                          const nit = c.nit || "";
-                          const razonSocial = c.razonSocial || "Sin nombre";
-                          const tel = c.telefono || c.celular || "";
-                          return `${nit} - ${razonSocial}${
-                            tel ? " - " + tel : ""
-                          }`;
-                        }}
+                        value={clienteSeleccionado}
+                        getOptionLabel={(c) =>
+                          c
+                            ? `${c.nit || "S/N"} · ${
+                                c.razonSocial || "Sin nombre"
+                              }`
+                            : ""
+                        }
                         filterOptions={filterClientes}
                         onChange={(_, value) =>
                           handleChange("clienteId", value?.id || "")
                         }
-                        isOptionEqualToValue={(opt, val) => opt.id === val.id}
+                        isOptionEqualToValue={(opt, val) =>
+                          Number(opt.id) === Number(val.id)
+                        }
+                        renderOption={renderClienteOption}
                         renderInput={(params) => (
                           <TextField
                             {...params}
-                            label="Cliente (buscar por CI o nombre) *"
+                            placeholder="Buscar cliente..."
                             size="small"
                             error={submitted && !form.clienteId}
                             helperText={
@@ -572,611 +698,257 @@ const VentasForm = ({
                                 ? "Seleccione un cliente"
                                 : ""
                             }
+                            sx={comboSx}
                           />
                         )}
                         loading={loadingData}
                         loadingText="Cargando clientes..."
-                        noOptionsText={
-                          clientes.length === 0
-                            ? "No hay clientes disponibles"
-                            : "Sin coincidencias"
-                        }
-                        sx={{ minWidth: 240 }}
+                        noOptionsText="No se encontraron clientes"
                         fullWidth
                       />
                     </Grid>
 
-                    {/* SUCURSAL */}
-                    <Grid item xs={12} md={4}>
-                      {isAdmin ? (
-                        <Autocomplete
-                          options={sucursales}
-                          getOptionLabel={(s) => s.nombre || "Sin nombre"}
-                          value={
-                            sucursales.find(
-                              (s) =>
-                                Number(s.id) ===
-                                Number(form.sucursalId || 0)
-                            ) || null
-                          }
-                          onChange={(_, value) =>
-                            handleChange("sucursalId", value?.id || "")
-                          }
-                          isOptionEqualToValue={(opt, val) =>
-                            opt.id === val.id
-                          }
-                          renderInput={(params) => (
-                            <TextField
-                              {...params}
-                              label="Sucursal *"
-                              size="small"
-                              error={submitted && isAdmin && !form.sucursalId}
-                              helperText={
-                                submitted && isAdmin && !form.sucursalId
-                                  ? "Seleccione una sucursal"
-                                  : ""
-                              }
-                            />
-                          )}
-                          loading={loadingData}
-                          loadingText="Cargando sucursales..."
-                          noOptionsText={
-                            sucursales.length === 0
-                              ? "No hay sucursales disponibles"
-                              : "Sin coincidencias"
-                          }
-                          sx={{ minWidth: 240 }}
-                          fullWidth
-                        />
-                      ) : (
-                        <TextField
-                          label="Sucursal"
-                          value={
-                            sucursalEmpleado?.nombre ||
-                            (empleadoSucursalId
-                              ? `Sucursal ID ${empleadoSucursalId}`
-                              : "Sucursal no configurada")
-                          }
-                          fullWidth
-                          size="small"
-                          InputProps={{ readOnly: true }}
-                          helperText={
-                            sucursalEmpleado
-                              ? "Sucursal asignada según el empleado"
-                              : "Su usuario no tiene sucursal asignada"
-                          }
-                        />
-                      )}
+                    <Grid
+                      size={{ xs: 12, md: 1.8 }}
+                      sx={{ display: "flex", alignItems: "flex-end" }}
+                    >
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        onClick={() => setShowClienteForm(true)}
+                        startIcon={<Plus size={14} />}
+                        sx={{
+                          height: 50,
+                          textTransform: "none",
+                          borderRadius: "16px",
+                          borderColor: brand[400],
+                          color: brand[600],
+                          fontWeight: 900,
+                          fontSize: 13,
+                          "&:hover": {
+                            borderColor: brand[700],
+                            bgcolor: brand[50],
+                          },
+                        }}
+                      >
+                        Nuevo
+                      </Button>
                     </Grid>
 
-                    {/* PANEL DE CLIENTE SELECCIONADO */}
                     {clienteSeleccionado && (
-                      <Grid item xs={12}>
-                        <Card
-                          variant="outlined"
+                      <Grid size={{ xs: 12 }}>
+                        <Box
                           sx={{
-                            backgroundColor: "grey.50",
-                            borderStyle: "dashed",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1.6,
+                            p: 1.6,
+                            borderRadius: 3,
+                            bgcolor: brand[50],
+                            border: `1px solid ${brand[100]}`,
                           }}
                         >
-                        </Card>
+                          <Avatar
+                            sx={{
+                              width: 40,
+                              height: 40,
+                              bgcolor: brand[600],
+                              fontSize: 14,
+                              fontWeight: 900,
+                            }}
+                          >
+                            {(clienteSeleccionado.razonSocial || "C")[0]}
+                          </Avatar>
+
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography
+                              sx={{
+                                fontWeight: 900,
+                                fontSize: 14,
+                                color: brand[800],
+                              }}
+                              noWrap
+                            >
+                              {clienteSeleccionado.razonSocial || "Cliente"}
+                            </Typography>
+
+                            <Box
+                              sx={{
+                                display: "flex",
+                                gap: 1.5,
+                                flexWrap: "wrap",
+                                mt: 0.3,
+                              }}
+                            >
+                              {clienteSeleccionado.nit && (
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  NIT: <strong>{clienteSeleccionado.nit}</strong>
+                                </Typography>
+                              )}
+
+                              {clienteSeleccionado.telefono && (
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 0.4,
+                                  }}
+                                >
+                                  <Phone size={11} />
+                                  {clienteSeleccionado.telefono}
+                                </Typography>
+                              )}
+
+                              {clienteSeleccionado.correo && (
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  {clienteSeleccionado.correo}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Box>
+                        </Box>
                       </Grid>
                     )}
                   </Grid>
                 </CardContent>
-              </Card>
+              </MotionCard>
 
-              {/* DETALLE DE PRODUCTOS */}
-              <Card variant="outlined">
-                <CardContent>
+              <MotionCard
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.28, delay: 0.04 }}
+                sx={sxCard}
+              >
+                <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
                   <Box
                     sx={{
                       display: "flex",
-                      flexWrap: "wrap",
+                      alignItems: { xs: "flex-start", sm: "center" },
                       justifyContent: "space-between",
-                      alignItems: "center",
-                      mb: 2,
-                      gap: 1,
+                      gap: 1.5,
+                      mb: 0.8,
+                      flexDirection: { xs: "column", sm: "row" },
                     }}
                   >
-                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    <Typography sx={sxSectionTitle}>
+                      <Package size={16} />
                       Productos
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Usa lector de código de barras o selección manual
-                    </Typography>
-                  </Box>
 
-                  {/* ENCABEZADO */}
-                  <Grid container spacing={2} sx={{ mb: 1, px: 1 }}>
-                    <Grid item xs={12} md={6}>
-                      <Typography variant="subtitle2" fontWeight={600}>
-                        Producto *
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} md={3}>
-                      <Typography variant="subtitle2" fontWeight={600}>
-                        Información
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={10} md={2}>
-                      <Typography variant="subtitle2" fontWeight={600}>
-                        Precio (Bs)
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={2} md={1}></Grid>
-                  </Grid>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        width: { xs: "100%", sm: "auto" },
+                      }}
+                    >
+                      <Badge color={brand[500]}>Paso 2</Badge>
 
-                  <Divider sx={{ mb: 2 }} />
-
-                  {/* LISTA DE PRODUCTOS */}
-                  {detalles.map((d, idx) => {
-                    const productosDisponibles = productos.filter((p) => {
-                      const yaUsadoEnOtraFila = detalles.some(
-                        (det, i) =>
-                          i !== idx && Number(det.productoId) === Number(p.id)
-                      );
-                      return !yaUsadoEnOtraFila;
-                    });
-
-                    const prodSeleccionado = productos.find(
-                      (p) => Number(p.id) === Number(d.productoId)
-                    );
-
-                    // mínimo permitido = precioOrigen, si no viene usamos precio
-                    const precioBase = Number(
-                      prodSeleccionado?.precioOrigen ?? prodSeleccionado?.precio ?? 0
-                    );
-
-                    // precio de lista (referencia) = precio
-                    const precioLista = Number(prodSeleccionado?.precio ?? 0);
-
-                    // 👇 IMPORTANTE: primero declaramos precioActual
-                    const precioActual = Number(d.subtotal || 0);
-
-                    const esCero =
-                      prodSeleccionado && precioActual === 0;
-
-                    const esNegativo =
-                      prodSeleccionado && precioActual < 0;
-
-                    const esMenorOIgualBase =
-                      prodSeleccionado &&
-                      precioActual > 0 &&
-                      precioActual <= precioBase;
-
-                    const maxRazonable =
-                      precioBase > 0 ? precioBase * 10 : 100000;
-
-                    const esDemasiadoAlto =
-                      prodSeleccionado && precioActual > maxRazonable;
-
-                    const mostrarErrorPrecio =
-                      esCero || esNegativo || esMenorOIgualBase || esDemasiadoAlto;
-
-                    return (
-                      <Grid
-                        container
-                        spacing={2}
-                        key={idx}
-                        alignItems="center"
+                      <Button
+                        variant="contained"
+                        size="small"
+                        startIcon={<Plus size={14} />}
+                        onClick={addDetalle}
                         sx={{
-                          mb: 2,
-                          p: 1,
-                          borderRadius: 1,
-                          backgroundColor:
-                            idx === activeDetalle ? "action.hover" : "transparent",
-                          transition: "background-color 0.2s",
+                          textTransform: "none",
+                          fontWeight: 900,
+                          fontSize: 13,
+                          borderRadius: "13px",
+                          bgcolor: brand[600],
+                          minHeight: 38,
+                          ml: { xs: "auto", sm: 0 },
+                          "&:hover": { bgcolor: brand[800] },
+                          boxShadow: `0 6px 14px ${brand[600]}44`,
                         }}
                       >
-                        {/* AUTOCOMPLETE PRODUCTO */}
-                        <Grid item xs={12} md={6}>
-                          <Autocomplete
-                            options={productosDisponibles}
-                            getOptionLabel={(p) =>
-                              p.numeroSerie && p.descripcion && p.precio
-                                ? `${p.numeroSerie} - ${p.descripcion} - Bs ${Number(
-                                    p.precio
-                                  ).toFixed(2)}`
-                                : p.numeroSerie ||
-                                  p.descripcion ||
-                                  "Producto sin información"
-                            }
-                            value={
-                              productos.find(
-                                (p) => Number(p.id) === Number(d.productoId)
-                              ) || null
-                            }
-                            onChange={(_, val) => {
-                              if (val) {
-                                setDetalles((prev) =>
-                                  prev.map((item, i) =>
-                                    i === idx
-                                      ? {
-                                          productoId: val.id,
-                                          subtotal: Number(
-                                            val.precio ?? val.precioOrigen ?? 0
-                                          ),
-                                        }
-                                      : item
-                                  )
-                                );
-                              } else {
-                                setDetalles((prev) =>
-                                  prev.map((item, i) =>
-                                    i === idx
-                                      ? { productoId: "", subtotal: 0 }
-                                      : item
-                                  )
-                                );
-                              }
-                            }}
-                            onFocus={() => setActiveDetalle(idx)}
-                            isOptionEqualToValue={(opt, val) => opt.id === val.id}
-                            renderInput={(params) => (
-                              <TextField
-                                {...params}
-                                inputRef={idx === activeDetalle ? productoInputRef : null}
-                                label={
-                                  loadingData
-                                    ? "Cargando productos..."
-                                    : "Seleccionar producto"
-                                }
-                                size="small"
-                                error={submitted && !d.productoId}
-                                helperText={
-                                  submitted && !d.productoId
-                                    ? "Seleccione un producto"
-                                    : ""
-                                }
-                                fullWidth
-                              />
-                            )}
-                            loading={loadingData}
-                            loadingText="Cargando productos..."
-                            noOptionsText={
-                              productosDisponibles.length === 0
-                                ? "No hay productos disponibles"
-                                : "Sin coincidencias"
-                            }
-                            fullWidth
-                            sx={{
-                              minWidth: 240,
-                              "& .MuiOutlinedInput-root": {
-                                borderRadius: "12px",
-                                paddingRight: "36px !important",
-                                backgroundColor: "#fff",
-                                height: 44,
-                                "& fieldset": {
-                                  borderColor: "#d8d8d8",
-                                },
-                                "&:hover fieldset": {
-                                  borderColor: "#a66",
-                                },
-                                "&.Mui-focused fieldset": {
-                                  borderColor: "#592B2B",
-                                  borderWidth: 2,
-                                },
-                              },
-                              "& .MuiOutlinedInput-input": {
-                                padding: "10px 12px",
-                                fontSize: "0.95rem",
-                              },
-                            }}
-                          />
-                        </Grid>
+                        Agregar
+                      </Button>
+                    </Box>
+                  </Box>
 
-                        {/* FICHA DEL PRODUCTO */}
-                        <Grid item xs={12} md={3}>
-                          {prodSeleccionado ? (
-                            <Card variant="outlined" sx={{ p: 1.5 }}>
-                              <Typography
-                                variant="subtitle2"
-                                fontWeight={600}
-                                noWrap
-                              >
-                                {prodSeleccionado.descripcion ||
-                                  prodSeleccionado.numeroSerie ||
-                                  "Producto"}
-                              </Typography>
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                Código: {prodSeleccionado.numeroSerie || "N/A"}
-                              </Typography>
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  gap: 0.2,
-                                  mt: 0.5,
-                                }}
-                              >
-                                <Typography
-                                  variant="body2"
-                                  fontWeight={600}
-                                  sx={{ color: "#592B2B" }}
-                                >
-                                  Precio Venta: Bs {precioLista.toFixed(2)}
-                                </Typography>
-                                
-                              </Box>
-                            </Card>
-                          ) : (
-                            <Box
-                              sx={{
-                                border: "1px dashed",
-                                borderColor: "divider",
-                                borderRadius: 1,
-                                p: 2,
-                                textAlign: "center",
-                              }}
-                            >
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                Seleccione un producto para ver información
-                              </Typography>
-                            </Box>
-                          )}
-                        </Grid>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ mb: 2, display: "block" }}
+                  >
+                    <Box
+                      component="span"
+                      sx={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 0.6,
+                      }}
+                    >
+                      <Barcode size={13} />
+                      Escanea el código de barras o busca manualmente. Solo
+                      productos disponibles en esta sucursal.
+                    </Box>
+                  </Typography>
 
-                        {/* PRECIO EDITABLE */}
-                        <Grid item xs={10} md={2}>
-                          <TextField
-                            label="Precio (Bs)"
-                            fullWidth
-                            size="small"
-                            type="number"
-                            value={
-                              d.subtotal === 0 || d.subtotal === ""
-                                ? ""
-                                : Number(d.subtotal).toString()
-                            }
-                            onChange={(e) => handlePrecioChange(idx, e.target.value)}
-                            onBlur={() => handlePrecioBlur(idx)}
-                            error={mostrarErrorPrecio}
-                            helperText={
-                              !prodSeleccionado
-                                ? ""
-                                : esCero
-                                ? "El precio no puede ser 0."
-                                : esNegativo
-                                ? "El precio no puede ser negativo."
-                                : esMenorOIgualBase
-                                ? `Debe ser mayor a Bs ${precioBase.toFixed(
-                                    2
-                                  )} (precio origen).`
-                                : esDemasiadoAlto
-                                ? "El precio ingresado es demasiado alto."
-                                : `Precio base: Bs ${precioBase.toFixed(2)}`
-                            }
-                            inputProps={{
-                              min: 1,
-                              max: maxRazonable,
-                              step: "0.01",
-                            }}
-                          />
-                        </Grid>
+                  <Divider sx={{ mb: 2, borderColor: "#EEE5E5" }} />
 
-                        {/* BOTÓN ELIMINAR */}
-                        <Grid item xs={2} md={1} sx={{ textAlign: "center" }}>
-                          {detalles.length > 1 && (
-                            <IconButton
-                              color="error"
-                              onClick={() => removeDetalle(idx)}
-                              size="small"
-                            >
-                              <Trash2 size={18} />
-                            </IconButton>
-                          )}
-                        </Grid>
-                      </Grid>
-                    );
-                  })}
+                  <Box sx={{ display: "grid", gap: 1.7 }}>
+                    {detalles.map((d, idx) => (
+                      <ProductRow
+                        key={idx}
+                        d={d}
+                        idx={idx}
+                        activeDetalle={activeDetalle}
+                        productos={productos}
+                        detalles={detalles}
+                        loadingData={loadingData}
+                        submitted={submitted}
+                        productoInputRef={productoInputRef}
+                        setActiveDetalle={setActiveDetalle}
+                        setDetalles={setDetalles}
+                        removeDetalle={removeDetalle}
+                      />
+                    ))}
+                  </Box>
 
                   {formError && (
-                    <Alert severity="error" sx={{ mt: 2 }}>
+                    <Alert
+                      severity="error"
+                      icon={<AlertCircle size={18} />}
+                      sx={{ mt: 2, borderRadius: 2 }}
+                    >
                       {formError}
                     </Alert>
                   )}
-
-                  <Button
-                    variant="outlined"
-                    startIcon={<Plus size={16} />}
-                    onClick={addDetalle}
-                    sx={{
-                      mt: 2,
-                      borderColor: "#592B2B",
-                      color: "#592B2B",
-                      "&:hover": {
-                        borderColor: "#3A1A1A",
-                        backgroundColor: "#592B2B08",
-                      },
-                    }}
-                  >
-                    Agregar producto
-                  </Button>
                 </CardContent>
-              </Card>
-            </Grid>
+              </MotionCard>
+            </Box>
 
-            {/* COLUMNA DERECHA: RESUMEN */}
-            <Grid item xs={12} md={3.5}>
-              <Card
-                variant="outlined"
-                sx={{
-                  borderRadius: 3,
-                  borderColor: "#f1d2d2",
-                  bgcolor: "white",
-                }}
-              >
-                <CardContent>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 2,
-                      mb: 1.5,
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: "50%",
-                        bgcolor: "#592B2B15",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "#592B2B",
-                      }}
-                    >
-                      <ShoppingCart size={20} />
-                    </Box>
-                    <Box>
-                      <Typography
-                        variant="subtitle1"
-                        sx={{ fontWeight: 700, color: "#3A1A1A" }}
-                      >
-                        Resumen de venta
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                      >
-                        Actualizado al agregar productos
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  <Divider sx={{ my: 1.5 }} />
-
-                  <Typography
-                    variant="caption"
-                    sx={{ fontWeight: 700, color: "#777" }}
-                  >
-                    Sucursal
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{ mb: 1.5, fontWeight: 500 }}
-                  >
-                    {sucursalActual?.nombre || "No seleccionada"}
-                  </Typography>
-
-                  <Typography
-                    variant="caption"
-                    sx={{ fontWeight: 700, color: "#777" }}
-                  >
-                    Cliente
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{ mb: 1.5, fontWeight: 500 }}
-                  >
-                    {clienteSeleccionado?.razonSocial || "Sin cliente"}
-                  </Typography>
-
-                  <Divider sx={{ my: 1.5 }} />
-
-                  {detallesResumen.length ? (
-                    <Box
-                      sx={{
-                        maxHeight: 260,
-                        overflowY: "auto",
-                        mb: 1.5,
-                        pr: 0.5,
-                      }}
-                    >
-                      {detallesResumen.map(({ prod, det, base }, index) => (
-                        <Box
-                          key={prod.id}
-                          sx={{
-                            mb: 1.2,
-                            pb: 1,
-                            borderBottom:
-                              index === detallesResumen.length - 1
-                                ? "none"
-                                : "1px dashed #eee",
-                          }}
-                        >
-                          <Typography
-                            variant="subtitle2"
-                            sx={{ fontWeight: 700 }}
-                            noWrap
-                          >
-                            {prod.numeroSerie || prod.descripcion || "Producto"}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Código: {prod.numeroSerie || "N/A"}
-                          </Typography>
-                          <Box
-                            sx={{
-                              mt: 0.4,
-                              display: "flex",
-                              justifyContent: "space-between",
-                              fontSize: 12,
-                            }}
-                          >
-                            <span>Base: Bs {base.toFixed(2)}</span>
-                            <span style={{ fontWeight: 600, color: "#592B2B" }}>
-                              Venta: Bs {Number(det.subtotal || 0).toFixed(2)}
-                            </span>
-                          </Box>
-                        </Box>
-                      ))}
-                    </Box>
-                  ) : (
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mb: 1.5 }}
-                    >
-                      Agrega productos para ver el detalle aquí.
-                    </Typography>
-                  )}
-
-
-                  <Divider sx={{ my: 2 }} />
-
-                  <Box
-                    sx={{
-                      borderRadius: 2.5,
-                      py: 2,
-                      textAlign: "center",
-                      background:
-                        "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
-                      color: "white",
-                    }}
-                  >
-                    <Typography
-                      variant="body2"
-                      sx={{ opacity: 0.85, mb: 0.5 }}
-                    >
-                      Total estimado
-                    </Typography>
-                    <Typography
-                      variant="h5"
-                      sx={{ fontWeight: 800, letterSpacing: 0.5 }}
-                    >
-                      Bs {total.toFixed(2)}
-                    </Typography>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
+            <VentaResumen
+              sucursalActual={sucursalActual}
+              clienteSeleccionado={clienteSeleccionado}
+              detallesResumen={detallesResumen}
+              total={total}
+            />
+          </Box>
         </DialogContent>
 
-        {/* FOOTER: SOLO BOTONES (ya quitamos el TOTAL de abajo) */}
         <DialogActions
           sx={{
-            p: 2.5,
-            gap: 1,
+            px: { xs: 2, md: 3 },
+            py: 2,
+            bgcolor: "#FFF",
+            borderTop: "1px solid #EEE5E5",
+            gap: 1.5,
             justifyContent: "flex-end",
+            flexShrink: 0,
+            position: { xs: "sticky", md: "static" },
+            bottom: 0,
+            zIndex: 2,
           }}
         >
           <Button
@@ -1184,50 +956,136 @@ const VentasForm = ({
             variant="outlined"
             disabled={loading}
             sx={{
-              borderRadius: 2,
-              borderColor: "#592B2B",
-              color: "#592B2B",
+              borderRadius: "14px",
+              borderColor: "#D1D5DB",
+              color: "#6B7280",
               textTransform: "none",
+              fontWeight: 800,
+              px: 3,
+              height: 44,
               "&:hover": {
-                borderColor: "#3A1A1A",
-                backgroundColor: "#592B2B08",
+                borderColor: brand[400],
+                color: brand[600],
+                bgcolor: brand[50],
               },
             }}
           >
             Cancelar
           </Button>
+
           <Button
-            type="button"          // 👈 importante
-            onClick={handleSubmit}
+            type="button"
+            onClick={() => {
+              setSubmitted(true);
+
+              const err = validateForm();
+              if (err) {
+                setFormError(err);
+                return;
+              }
+
+              setShowConfirm(true);
+            }}
             variant="contained"
             disabled={loading}
             sx={{
-              minWidth: 160,
-              borderRadius: 2,
+              minWidth: { xs: 150, sm: 190 },
+              borderRadius: "14px",
               textTransform: "none",
-              fontWeight: 600,
-              background: "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
-              boxShadow: "0 4px 10px rgba(89,43,43,0.25)",
-              "&:hover": {
-                background:
-                  "linear-gradient(135deg, #3A1A1A 0%, #592B2B 100%)",
-                boxShadow: "0 6px 16px rgba(89,43,43,0.35)",
-              },
+              fontWeight: 900,
+              fontSize: 14,
+              px: 3,
+              height: 44,
+              background: `linear-gradient(135deg, ${brand[600]} 0%, ${brand[900]} 100%)`,
             }}
           >
             {loading ? "Guardando..." : "Guardar venta"}
           </Button>
-
         </DialogActions>
       </Dialog>
+      <MuiDialog
+        open={showConfirm}
+        onClose={() => {
+          if (!loading) setShowConfirm(false);
+        }}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 4,
+            p: 1,
+          },
+        }}
+      >
+        <MuiDialogTitle
+          sx={{
+            fontWeight: 900,
+            color: brand[800],
+            pb: 1,
+          }}
+        >
+          Confirmar venta
+        </MuiDialogTitle>
 
-      {/* Comprobante */}
-      <Comprobante
-        open={showResumen}
-        onClose={handleCloseResumen}
-        ventaResumen={ventaResumen}
+        <MuiDialogContent>
+          <Typography sx={{ color: "#4B5563", fontSize: 14 }}>
+            ¿Está segura de registrar esta venta por un total de{" "}
+            <strong>Bs {total.toFixed(2)}</strong>?
+          </Typography>
+        </MuiDialogContent>
+
+        <MuiDialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button
+            onClick={() => setShowConfirm(false)}
+            disabled={loading}
+            variant="outlined"
+            sx={{
+              borderRadius: "12px",
+              textTransform: "none",
+              fontWeight: 800,
+            }}
+          >
+            No, revisar
+          </Button>
+
+          <Button
+            onClick={handleSubmit}
+            disabled={loading}
+            variant="contained"
+            sx={{
+              borderRadius: "12px",
+              textTransform: "none",
+              fontWeight: 900,
+              bgcolor: brand[600],
+              "&:hover": { bgcolor: brand[800] },
+            }}
+          >
+            {loading ? "Guardando..." : "Sí, confirmar"}
+          </Button>
+        </MuiDialogActions>
+      </MuiDialog>
+      {showClienteForm && (
+        <ClienteForm
+          onClose={() => setShowClienteForm(false)}
+          onSuccess={async () => {
+            const res = await ServiceCliente.getAll({
+              page: 1,
+              pageSize: 1000,
+            });
+
+            setClientes(Array.isArray(res) ? res : res.items || []);
+            setShowClienteForm(false);
+            toast.success("Cliente agregado correctamente");
+          }}
+        />
+        
+      )}
+      <SuccessDialog
+        open={showSuccess}
+        message="La venta se registró correctamente"
       />
     </>
+    
   );
 };
 

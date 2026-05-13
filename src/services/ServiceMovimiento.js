@@ -6,9 +6,37 @@ const BASE = "/movimientos";
 // 👇 ahora acepta params (por ejemplo { usuarioId: 1006 })
 const getAll = async (params = {}) => {
   try {
-    const { data } = await api.get(`${BASE}/`, { params });
-    // backend devuelve lista simple
-    return { items: data, total: data.length };
+    const cleanParams = {
+      search: params.search || "",
+      page: Number(params.page || 1),
+      pageSize: Number(params.pageSize || 10),
+
+      ...(params.usuarioId && {
+        usuarioId: Number(params.usuarioId),
+      }),
+
+      ...(params.almacenId && {
+        almacenId: Number(params.almacenId),
+      }),
+      ...(params.estadoProducto && {
+        estadoProducto: Number(params.estadoProducto),
+      }),
+
+      ...(params.fecha && {
+        fecha: params.fecha,
+      }),
+    };
+
+    const { data } = await api.get(`${BASE}/`, { params: cleanParams });
+
+    if (Array.isArray(data)) {
+      return { items: data, total: data.length };
+    }
+
+    return {
+      items: data.items || [],
+      total: data.total ?? 0,
+    };
   } catch (err) {
     console.error("❌ Error al listar movimientos:", err?.response?.data);
     throw new Error(
@@ -16,7 +44,6 @@ const getAll = async (params = {}) => {
     );
   }
 };
-
 const getById = async (id) => {
   try {
     const { data } = await api.get(`${BASE}/${id}`);

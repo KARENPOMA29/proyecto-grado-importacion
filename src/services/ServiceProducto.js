@@ -34,6 +34,11 @@ const getDetalleBySerie = async (serie) => {
   const { data } = await api.get(`${BASE}/detalle/by-serie/${serie}`);
   return data; // puede ser null
 };
+
+const getDisponiblesPorSucursal = async (sucursalId) => {
+  const { data } = await api.get(`/productos/disponibles/sucursal/${sucursalId}`);
+  return Array.isArray(data) ? data : data.items || [];
+};
 const ServiceProducto = {
   create,
   getAll,
@@ -42,6 +47,7 @@ const ServiceProducto = {
   getBySerie,
   getDetalleBySerie,
   update,
+  getDisponiblesPorSucursal
 };
 
 export default ServiceProducto;

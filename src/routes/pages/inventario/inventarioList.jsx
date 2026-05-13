@@ -20,6 +20,7 @@ import {
   Button,
   IconButton,
   CircularProgress,
+  Chip,
 } from "@mui/material";
 
 import GridGenerico from "@/components/Grid";
@@ -62,7 +63,8 @@ const MovimientoList = () => {
 
   const [loadingSucursales, setLoadingSucursales] = useState(false);
   const [loadingAlmacenes, setLoadingAlmacenes] = useState(false);
-
+  const [estadoProductoFiltro, setEstadoProductoFiltro] = useState("");
+  const [fechaFiltro, setFechaFiltro] = useState("");
   // Cache productos para mostrar serie en la tabla/detalle
   const [productos, setProductos] = useState([]);
 
@@ -248,6 +250,40 @@ const MovimientoList = () => {
       minWidth: "170px",
     },
     {
+  name: "Estado producto",
+    selector: (r) => r.productoEstado ?? "",
+    sortable: true,
+    minWidth: "150px",
+    cell: (r) => {
+      const estado = Number(r.productoEstado);
+
+      const label =
+        estado === 1 ? "Disponible" :
+        estado === 2 ? "Vendido" :
+        estado === 0 ? "Inactivo" :
+        "—";
+
+      const sx =
+        estado === 1
+          ? { bgcolor: "#E8F5E9", color: "#1B5E20" }
+          : estado === 2
+          ? { bgcolor: "#FEE2E2", color: "#991B1B" }
+          : { bgcolor: "#F3F4F6", color: "#374151" };
+
+      return (
+        <Chip
+          size="small"
+          label={label}
+          sx={{
+            fontWeight: 800,
+            borderRadius: "10px",
+            ...sx,
+          }}
+        />
+      );
+    },
+  },
+    {
       name: "Almacén",
       selector: (r) =>
         r.almacen?.nombre || r.almacenNombre || r.almacenId || "—",
@@ -262,14 +298,20 @@ const MovimientoList = () => {
     },
     {
       name: "Fecha",
-      selector: (r) =>
-        r.fecha
-          ? new Date(r.fecha).toLocaleString()
-          : r.fechaRegistro
-          ? new Date(r.fechaRegistro).toLocaleString()
-          : "—",
+      selector: (r) => r.fecha || r.fechaRegistro || "",
       sortable: true,
-      minWidth: "160px",
+      minWidth: "120px",
+
+      cell: (r) => {
+        const value = r.fecha || r.fechaRegistro;
+
+        if (!value) return "—";
+
+        const fecha = String(value).split("T")[0];
+        const [yyyy, mm, dd] = fecha.split("-");
+
+        return `${dd}/${mm}/${yyyy}`;
+      },
     },
   ];
 
@@ -278,6 +320,19 @@ const MovimientoList = () => {
       label: "Producto (serie)",
       key: "productoSerie",
       format: (v, row) => v ?? row?.producto?.numeroSerie ?? "—",
+    },
+    {
+      label: "Estado del producto",
+      key: "productoEstado",
+      format: (v) => {
+        const estado = Number(v);
+
+        if (estado === 1) return "Disponible";
+        if (estado === 2) return "Vendido";
+        if (estado === 0) return "Inactivo";
+
+        return "—";
+      },
     },
     {
       label: "Producto (descripción)",
@@ -304,7 +359,14 @@ const MovimientoList = () => {
     {
       label: "Fecha",
       key: "fecha",
-      format: (v) => (v ? new Date(v).toLocaleString() : "—"),
+      format: (v) => {
+        if (!v) return "—";
+
+        const fecha = String(v).split("T")[0];
+        const [yyyy, mm, dd] = fecha.split("-");
+
+        return `${dd}/${mm}/${yyyy}`;
+      },
     },
     {
       label: "Precio",
@@ -356,6 +418,8 @@ const MovimientoList = () => {
         return baseMovimientoService.getAll({
           ...params,
           almacenId: selectedAlmacen.id,
+          estadoProducto: estadoProductoFiltro || undefined,
+          fecha: fechaFiltro || undefined,
         });
       },
     };
@@ -1729,6 +1793,8 @@ const MovimientoList = () => {
             gridRef.current?.refetch();
           }}
           usuarioId={usuarioIdLogueado}
+          sucursalSeleccionada={selectedSucursal}
+          almacenSeleccionado={selectedAlmacen}
         />
       )}
     </Box>

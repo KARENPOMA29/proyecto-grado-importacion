@@ -202,7 +202,6 @@ const SeccionesAlmacenDialog = ({ open, almacen, onClose }) => {
                 </Typography>
               </Box>
             </Box>
-
             {canCreate && (
               <Button
                 variant="contained"

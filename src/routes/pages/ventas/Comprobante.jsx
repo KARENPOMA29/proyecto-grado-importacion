@@ -1,544 +1,496 @@
 // src/routes/pages/ventas/Comprobante.jsx
 import { useRef } from "react";
 import {
-  Modal,
-  Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
   Box,
   Typography,
-  Divider,
-  Button,
-  Grid,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
   IconButton,
 } from "@mui/material";
-import { Download, Printer, X } from "lucide-react";
+import { X, ReceiptText, Printer, Download } from "lucide-react";
 
-const Comprobante = ({ open, onClose, ventaResumen }) => {
-  const resumenRef = useRef(null);
+export default function Comprobante({ open, onClose, ventaResumen }) {
+  const comprobanteRef = useRef(null);
+  const venta = ventaResumen || {};
 
-  const handlePrintResumen = () => {
-    if (!resumenRef.current) return;
-    const contenido = resumenRef.current.innerHTML;
-    const ventana = window.open("", "PRINT", "height=600,width=800");
-    ventana.document.write(`
-      <html>
-        <head>
-          <title>Detalle de venta - Comercial Poma</title>
-          <style>
-            body { 
-              font-family: 'Arial', sans-serif; 
-              padding: 20px; 
-              max-width: 800px;
-              margin: 0 auto;
-            }
-            .header { 
-              text-align: center; 
-              border-bottom: 2px solid #333;
-              padding-bottom: 15px;
-              margin-bottom: 20px;
-            }
-            .empresa { 
-              font-size: 24px; 
-              font-weight: bold; 
-              color: #333;
-            }
-            .slogan {
-              font-size: 14px;
-              color: #666;
-            }
-            .codigo-venta {
-              background: #f5f5f5;
-              padding: 10px;
-              text-align: center;
-              font-weight: bold;
-              margin: 15px 0;
-              border-radius: 5px;
-            }
-            table { 
-              width: 100%; 
-              border-collapse: collapse; 
-              margin: 15px 0;
-              font-size: 12px;
-            }
-            th, td { 
-              border: 1px solid #ddd; 
-              padding: 8px; 
-              text-align: left;
-            }
-            th { 
-              background: #f8f9fa; 
-              font-weight: bold;
-            }
-            .total { 
-              text-align: right; 
-              font-weight: bold; 
-              font-size: 16px;
-              margin-top: 15px;
-              padding-top: 15px;
-              border-top: 2px solid #333;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 30px;
-              font-size: 12px;
-              color: #666;
-            }
-          </style>
-        </head>
-        <body>${contenido}</body>
-      </html>
-    `);
-    ventana.document.close();
-    ventana.focus();
-    ventana.print();
-    ventana.close();
-  };
+  const cliente = venta.cliente || {};
+  const sucursal = venta.sucursal || {};
+  const empleado = venta.empleado || {};
+  const detalles = Array.isArray(venta.detalles) ? venta.detalles : [];
 
-  const handleDownloadResumen = () => {
-    if (!resumenRef.current) return;
+  const formatMoney = (value) => Number(value || 0).toFixed(2);
 
-    const contenido = resumenRef.current.innerHTML;
-    const estilo = `
-      <style>
-        body { 
-          font-family: 'Arial', sans-serif; 
-          padding: 20px; 
-          max-width: 800px;
-          margin: 0 auto;
-        }
-        .header { 
-          text-align: center; 
-          border-bottom: 2px solid #333;
-          padding-bottom: 15px;
-          margin-bottom: 20px;
-        }
-        .empresa { 
-          font-size: 24px; 
-          font-weight: bold; 
-          color: #333;
-        }
-        .slogan {
-          font-size: 14px;
-          color: #666;
-        }
-        .codigo-venta {
-          background: #f5f5f5;
-          padding: 10px;
-          text-align: center;
-          font-weight: bold;
-          margin: 15px 0;
-          border-radius: 5px;
-        }
-        table { 
-          width: 100%; 
-          border-collapse: collapse; 
-          margin: 15px 0;
-          font-size: 12px;
-        }
-        th, td { 
-          border: 1px solid #ddd; 
-          padding: 8px; 
-          text-align: left;
-        }
-        th { 
-          background: #f8f9fa; 
-          font-weight: bold;
-        }
-        .total { 
-          text-align: right; 
-          font-weight: bold; 
-          font-size: 16px;
-          margin-top: 15px;
-          padding-top: 15px;
-          border-top: 2px solid #333;
-        }
-        .footer {
-          text-align: center;
-          margin-top: 30px;
-          font-size: 12px;
-          color: #666;
-        }
-      </style>
-    `;
-
-    const ventana = window.open();
-    ventana.document.write(`
-      <html>
-        <head>
-          <title>Detalle de venta - Comercial Poma</title>
-          ${estilo}
-        </head>
-        <body>${contenido}</body>
-      </html>
-    `);
-    ventana.document.close();
-  };
-
-  // ===== Helpers de empleado =====
-  const empleado = ventaResumen?.empleado || {};
   const empleadoNombre =
     empleado.nombreCompleto ||
     [empleado.nombre, empleado.apellido, empleado.segundoApellido]
       .filter(Boolean)
       .join(" ") ||
-    "N/A";
+    venta.empleadoNombre ||
+    (venta.empleadoId ? `Empleado #${venta.empleadoId}` : "—");
 
-  const empleadoCi = empleado.ci || "N/A";
+  const clienteNombre =
+    cliente.razonSocial ||
+    cliente.nombreCompleto ||
+    cliente.nombre ||
+    venta.clienteNombre ||
+    (venta.clienteId ? `Cliente #${venta.clienteId}` : "—");
 
-  // ===== Fecha =====
-  const fechaTexto =
-    ventaResumen?.fecha ||
-    (ventaResumen?.fechaRegistro
-      ? new Date(ventaResumen.fechaRegistro).toLocaleString()
-      : "N/A");
+  const sucursalNombre =
+    sucursal.nombre ||
+    venta.sucursalNombre ||
+    (venta.sucursalId ? `Sucursal #${venta.sucursalId}` : "—");
 
-  // ===== Total seguro =====
-  const totalBs = Number(ventaResumen?.total || 0).toFixed(2);
+  const fechaTexto = venta.fechaRegistro
+    ? new Date(venta.fechaRegistro).toLocaleString("es-BO")
+    : "—";
+
+  const printStyles = `
+    <style>
+      @page {
+        size: 8.5in 5.5in;
+        margin: 0.25in;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        color: #111;
+        background: white;
+      }
+
+      .receipt {
+        width: 8in;
+        min-height: 5in;
+        margin: 0 auto;
+        padding: 10px 14px;
+        font-size: 11px;
+      }
+
+      .company {
+        text-align: center;
+        border-bottom: 2px solid #592B2B;
+        padding-bottom: 6px;
+        margin-bottom: 8px;
+      }
+
+      .company h1 {
+        margin: 0;
+        font-size: 24px;
+        color: #592B2B;
+        letter-spacing: 1px;
+      }
+
+      .company p {
+        margin: 2px 0 0;
+        font-size: 11px;
+        color: #555;
+      }
+
+      .sale-box {
+        display: flex;
+        justify-content: space-between;
+        background: #f6f1f1;
+        border-radius: 6px;
+        padding: 8px 10px;
+        margin-bottom: 8px;
+      }
+
+      .sale-box h2 {
+        margin: 0;
+        font-size: 16px;
+        color: #2b1111;
+      }
+
+      .sale-box p {
+        margin: 2px 0 0;
+        font-size: 11px;
+      }
+
+      .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+
+      .info-card {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 7px 9px;
+      }
+
+      .info-card h3 {
+        margin: 0 0 4px;
+        font-size: 12px;
+        color: #2b1111;
+      }
+
+      .info-card p {
+        margin: 2px 0;
+        font-size: 10.5px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 5px;
+        font-size: 10px;
+      }
+
+      th {
+        background: #f6f1f1;
+        color: #2b1111;
+      }
+
+      th, td {
+        border: 1px solid #d8d8d8;
+        padding: 5px;
+      }
+
+      .right {
+        text-align: right;
+      }
+
+      .total {
+        margin-top: 8px;
+        border-top: 2px solid #592B2B;
+        padding-top: 6px;
+        text-align: right;
+        font-size: 16px;
+        font-weight: bold;
+      }
+
+      .footer {
+        text-align: center;
+        margin-top: 8px;
+        font-size: 10px;
+        color: #555;
+      }
+
+      @media print {
+        body {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+      }
+    </style>
+  `;
+
+  const openPrintWindow = () => {
+    if (!comprobanteRef.current) return null;
+
+    const ventana = window.open("", "PRINT", "width=900,height=650");
+    if (!ventana) return null;
+
+    ventana.document.write(`
+      <html>
+        <head>
+          <title>Comprobante de venta - Comercial Poma</title>
+          ${printStyles}
+        </head>
+        <body>${comprobanteRef.current.innerHTML}</body>
+      </html>
+    `);
+
+    ventana.document.close();
+    ventana.focus();
+
+    return ventana;
+  };
+
+  const handlePrint = () => {
+    const ventana = openPrintWindow();
+    if (!ventana) return;
+
+    setTimeout(() => {
+      ventana.print();
+      ventana.close();
+    }, 250);
+  };
+
+  const handleDownload = () => {
+    openPrintWindow();
+  };
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <Paper
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
+      <DialogTitle
         sx={{
-          width: "90%",
-          maxWidth: 800,
-          maxHeight: "90vh",
-          overflow: "auto",
-          p: 3,
+          bgcolor: "#592B2B",
+          color: "white",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          py: 1.8,
         }}
       >
-        {/* HEADER MODAL */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <ReceiptText size={22} />
+          Comprobante de venta
+        </Box>
+
+        <IconButton onClick={onClose} sx={{ color: "white" }}>
+          <X size={20} />
+        </IconButton>
+      </DialogTitle>
+
+      <DialogContent dividers sx={{ bgcolor: "#fafafa", p: 3 }}>
         <Box
+          ref={comprobanteRef}
           sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 2,
+            bgcolor: "white",
+            borderRadius: 2,
+            p: 2,
+            border: "1px solid #e5e5e5",
           }}
         >
-          <Typography variant="h5" fontWeight="bold">
-            Comprobante de Venta
-          </Typography>
-          <IconButton onClick={onClose}>
-            <X size={20} />
-          </IconButton>
-        </Box>
+          <Box className="receipt">
+            <Box className="company">
+              <Typography
+                component="h1"
+                sx={{
+                  m: 0,
+                  fontSize: 28,
+                  color: "#592B2B",
+                  fontWeight: 900,
+                  letterSpacing: 1,
+                  textAlign: "center",
+                }}
+              >
+                COMERCIAL POMA
+              </Typography>
 
-        <Divider sx={{ mb: 3 }} />
+              <Typography sx={{ textAlign: "center", color: "#666" }}>
+                “Calidad y confianza en cada producto”
+              </Typography>
+            </Box>
 
-        {/* CONTENIDO DEL RESUMEN (LO QUE SE IMPRIME / DESCARGA) */}
-        <Box ref={resumenRef}>
-          {/* ENCABEZADO EMPRESA */}
-          <Box sx={{ textAlign: "center", mb: 3 }}>
-            <Typography variant="h4" fontWeight="bold" color="primary">
-              COMERCIAL POMA
+            <Box
+              className="sale-box"
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                bgcolor: "#f6f1f1",
+                borderRadius: 2,
+                p: 1.5,
+                my: 1.5,
+                gap: 2,
+                flexWrap: "wrap",
+              }}
+            >
+              <Box>
+                <Typography component="h2" fontWeight={900} fontSize={20}>
+                  Venta #: {venta.codigoVenta || venta.id || "—"}
+                </Typography>
+                <Typography fontSize={13}>Fecha: {fechaTexto}</Typography>
+              </Box>
+
+              <Typography fontWeight={800} color="#592B2B">
+                Comprobante
+              </Typography>
+            </Box>
+
+            <Box
+              className="info-grid"
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                gap: 1.5,
+                mb: 1.5,
+              }}
+            >
+              <InfoCard
+                title="Datos del cliente"
+                lines={[
+                  `Nombre/Razón social: ${clienteNombre}`,
+                  `NIT: ${cliente.nit || "—"}`,
+                  `Teléfono: ${cliente.telefono || cliente.celular || "—"}`,
+                  `Correo: ${cliente.correo || "—"}`,
+                ]}
+              />
+
+              <InfoCard
+                title="Sucursal y empleado"
+                lines={[
+                  `Sucursal: ${sucursalNombre}`,
+                  `Ciudad: ${sucursal.ciudad || sucursal.ciudadNombre || "—"}`,
+                  `Dirección: ${sucursal.direccion || "—"}`,
+                  `Teléfono: ${sucursal.telefono || "—"}`,
+                  `Atendido por: ${empleadoNombre}`,
+                ]}
+              />
+            </Box>
+
+            <Typography fontWeight={900} color="#2b1111" mb={1}>
+              Detalles de la venta
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              "Calidad y confianza en cada producto"
-            </Typography>
-          </Box>
 
-          {/* CÓDIGO DE VENTA + FECHA */}
-          <Box
-            sx={{
-              backgroundColor: "grey.100",
-              p: 2,
-              borderRadius: 1,
-              textAlign: "center",
-              mb: 2,
-            }}
-          >
-            <Typography variant="h6" fontWeight="bold">
-              Venta #: {ventaResumen?.codigoVenta || ventaResumen?.id || "N/A"}
-            </Typography>
-            <Typography variant="body2">Fecha: {fechaTexto}</Typography>
-          </Box>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ bgcolor: "#f6f1f1" }}>
+                  <TableCell>
+                    <b>Producto</b>
+                  </TableCell>
+                  <TableCell>
+                    <b>Marca / Modelo</b>
+                  </TableCell>
+                  <TableCell>
+                    <b>N° Serie</b>
+                  </TableCell>
+                  <TableCell align="right">
+                    <b>Precio (Bs)</b>
+                  </TableCell>
+                  <TableCell align="right">
+                    <b>Subtotal (Bs)</b>
+                  </TableCell>
+                </TableRow>
+              </TableHead>
 
-          {/* DATOS DE SUCURSAL Y EMPLEADO */}
-          <Box
-            sx={{
-              backgroundColor: "grey.50",
-              p: 2,
-              borderRadius: 1,
-              mb: 2,
-            }}
-          >
-            <Typography variant="subtitle1" fontWeight="bold" mb={1}>
-              Datos de la Sucursal y Empleado
-            </Typography>
-            <Grid container spacing={1}>
-              {/* Sucursal */}
-              <Grid item xs={12} sm={6}>
-                <Typography variant="body2">
-                  <strong>Sucursal:</strong>{" "}
-                  {ventaResumen?.sucursal?.nombre || "N/A"}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Ciudad:</strong>{" "}
-                  {
-                    ventaResumen?.sucursal?.ciudad ||
-                    ventaResumen?.sucursal?.ciudadNombre ||
-                    "N/A"
-                  }
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Teléfono:</strong>{" "}
-                  {ventaResumen?.sucursal?.telefono || "N/A"}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Dirección:</strong>{" "}
-                  {ventaResumen?.sucursal?.direccion || "N/A"}
-                </Typography>
-              </Grid>
+              <TableBody>
+                {detalles.length > 0 ? (
+                  detalles.map((detalle, index) => {
+                    const prod = detalle.producto || {};
+                    const modelo = prod.modelo || {};
+                    const marca = modelo.marca || {};
 
-              {/* Empleado */}
-              <Grid item xs={12} sm={6}>
-                <Typography variant="body2">
-                  <strong>Atendido por:</strong> {empleadoNombre}
-                </Typography>
-                
-              </Grid>
-            </Grid>
-          </Box>
+                    const marcaModelo =
+                      [
+                        marca.nombre || prod.marcaNombre,
+                        modelo.nombreModelo || prod.modeloNombre,
+                        modelo.color || prod.color,
+                      ]
+                        .filter(Boolean)
+                        .join(" - ") || "—";
 
-          {/* INFORMACIÓN DEL CLIENTE */}
-          <Box
-            sx={{
-              backgroundColor: "grey.50",
-              p: 2,
-              borderRadius: 1,
-              mb: 2,
-            }}
-          >
-            <Typography variant="subtitle1" fontWeight="bold" mb={1}>
-              Datos del Cliente
-            </Typography>
-            <Grid container spacing={1}>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="body2">
-                  <strong>Nombre / Razón social:</strong>{" "}
-                  {ventaResumen?.cliente?.razonSocial ||
-                    ventaResumen?.cliente?.nombre ||
-                    "N/A"}
-                </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="body2">
-                  <strong>NIT:</strong>{" "}
-                  {ventaResumen?.cliente?.nit || "N/A"}
-                </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="body2">
-                  <strong>Teléfono:</strong>{" "}
-                  {ventaResumen?.cliente?.telefono ||
-                    ventaResumen?.cliente?.celular ||
-                    "N/A"}
-                </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="body2">
-                  <strong>Correo:</strong>{" "}
-                  {ventaResumen?.cliente?.correo || "N/A"}
-                </Typography>
-              </Grid>
-            </Grid>
-          </Box>
+                    const precioUnitario = Number(
+                      detalle.precioUnitario || prod.precio || detalle.subtotal || 0
+                    ).toFixed(2);
 
-          {/* DETALLES DE PRODUCTOS (TABLA DETALLADA) */}
-          <Typography variant="subtitle1" fontWeight="bold" mb={1}>
-            Detalles de la Venta
-          </Typography>
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              marginBottom: "20px",
-              fontSize: "12px",
-            }}
-          >
-            <thead>
-              <tr style={{ backgroundColor: "#f8f9fa" }}>
-                <th
-                  style={{
-                    border: "1px solid #ddd",
-                    padding: "8px",
-                    textAlign: "left",
-                  }}
-                >
-                  Producto
-                </th>
-                <th
-                  style={{
-                    border: "1px solid #ddd",
-                    padding: "8px",
-                    textAlign: "left",
-                  }}
-                >
-                  Marca / Modelo
-                </th>
-                <th
-                  style={{
-                    border: "1px solid #ddd",
-                    padding: "8px",
-                    textAlign: "left",
-                  }}
-                >
-                  N° Serie
-                </th>
-                <th
-                  style={{
-                    border: "1px solid #ddd",
-                    padding: "8px",
-                    textAlign: "right",
-                  }}
-                >
-                  Precio unit. (Bs)
-                </th>
-                <th
-                  style={{
-                    border: "1px solid #ddd",
-                    padding: "8px",
-                    textAlign: "right",
-                  }}
-                >
-                  Subtotal (Bs)
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {ventaResumen?.detalles?.map((detalle, index) => {
-                const prod = detalle.producto || {};
-                const modelo = prod.modelo || {};
-                const marca = modelo.marca || {};
+                    return (
+                      <TableRow key={detalle.id || index}>
+                        <TableCell>
+                          {prod.descripcion || detalle.descripcion || "Producto"}
+                        </TableCell>
 
-                const precioUnit = Number(prod.precio || 0).toFixed(2);
-                const subtotal = Number(detalle.subtotal || 0).toFixed(2);
+                        <TableCell>{marcaModelo}</TableCell>
 
-                const marcaModelo = [
-                  marca.nombre,
-                  modelo.nombreModelo,
-                  modelo.color,
-                ]
-                  .filter(Boolean)
-                  .join(" - ");
+                        <TableCell>
+                          {prod.numeroSerie || detalle.numeroSerie || "—"}
+                        </TableCell>
 
-                return (
-                  <tr key={index}>
-                    <td
-                      style={{
-                        border: "1px solid #ddd",
-                        padding: "8px",
-                      }}
-                    >
-                      {prod.descripcion || "Producto"}
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid #ddd",
-                        padding: "8px",
-                      }}
-                    >
-                      {marcaModelo || "N/A"}
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid #ddd",
-                        padding: "8px",
-                      }}
-                    >
-                      {prod.numeroSerie || "N/A"}
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid #ddd",
-                        padding: "8px",
-                        textAlign: "right",
-                      }}
-                    >
-                      {precioUnit}
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid #ddd",
-                        padding: "8px",
-                        textAlign: "right",
-                      }}
-                    >
-                      {subtotal}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                        <TableCell align="right">
+                          {precioUnitario}
+                        </TableCell>
 
-          {/* TOTAL */}
-          <Box
-            sx={{
-              textAlign: "right",
-              borderTop: "2px solid #333",
-              paddingTop: 2,
-            }}
-          >
-            <Typography variant="h6" fontWeight="bold">
-              TOTAL: Bs {totalBs}
-            </Typography>
-          </Box>
+                        <TableCell align="right">
+                          {formatMoney(detalle.subtotal)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center">
+                      No hay productos registrados
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
 
-          {/* PIE DE PÁGINA */}
-          <Box
-            sx={{
-              textAlign: "center",
-              mt: 4,
-              color: "text.secondary",
-            }}
-          >
-            <Typography variant="body2">
-              ¡Gracias por su compra!
-            </Typography>
-            <Typography variant="caption">
-              Comercial Poma - Su tienda de confianza
-            </Typography>
+            <Box
+              className="total"
+              sx={{
+                mt: 2,
+                pt: 1.5,
+                borderTop: "2px solid #592B2B",
+                textAlign: "right",
+                fontSize: 22,
+                fontWeight: 900,
+              }}
+            >
+              TOTAL: Bs {formatMoney(venta.total)}
+            </Box>
+
+            <Box className="footer" sx={{ textAlign: "center", mt: 2 }}>
+              <Typography fontSize={13}>¡Gracias por su compra!</Typography>
+              <Typography fontSize={12} color="text.secondary">
+                Comercial Poma - Su tienda de confianza
+              </Typography>
+            </Box>
           </Box>
         </Box>
+      </DialogContent>
 
-        {/* BOTONES DE ACCIÓN */}
-        <Box
+      <DialogActions sx={{ px: 3, py: 2, flexWrap: "wrap", gap: 1 }}>
+        <Button onClick={onClose} variant="outlined">
+          Cerrar
+        </Button>
+
+        <Button
+          onClick={handleDownload}
+          variant="outlined"
+          startIcon={<Download size={17} />}
           sx={{
-            display: "flex",
-            gap: 2,
-            justifyContent: "center",
-            mt: 3,
+            borderColor: "#592B2B",
+            color: "#592B2B",
+            "&:hover": {
+              borderColor: "#3A1A1A",
+              bgcolor: "#592B2B10",
+            },
           }}
         >
-          <Button
-            variant="outlined"
-            startIcon={<Download size={16} />}
-            onClick={handleDownloadResumen}
-          >
-            Descargar
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<Printer size={16} />}
-            onClick={handlePrintResumen}
-          >
-            Imprimir
-          </Button>
-          <Button variant="contained" onClick={onClose}>
-            Cerrar
-          </Button>
-        </Box>
-      </Paper>
-    </Modal>
+          Descargar
+        </Button>
+
+        <Button
+          onClick={handlePrint}
+          variant="contained"
+          startIcon={<Printer size={17} />}
+          sx={{
+            bgcolor: "#592B2B",
+            "&:hover": { bgcolor: "#3A1A1A" },
+          }}
+        >
+          Imprimir
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
-};
+}
 
-export default Comprobante;
+function InfoCard({ title, lines }) {
+  return (
+    <Box
+      className="info-card"
+      sx={{
+        border: "1px solid #ddd",
+        borderRadius: 2,
+        p: 1.5,
+        bgcolor: "#fff",
+      }}
+    >
+      <Typography component="h3" fontWeight={900} color="#2b1111" mb={0.7}>
+        {title}
+      </Typography>
+
+      {(Array.isArray(lines) ? lines : []).map((line, index) => (
+        <Typography key={index} fontSize={13} color="#333">
+          {line}
+        </Typography>
+      ))}
+    </Box>
+  );
+}

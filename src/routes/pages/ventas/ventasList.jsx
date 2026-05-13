@@ -31,7 +31,7 @@ import { toast } from "react-toastify";
 import VentasForm from "./VentasForm";
 import DeleteConfirm from "@/components/deleteConfirm";
 import { useAuth } from "@/context/AuthContext";
-
+import Comprobante from "./Comprobante";
 const STEP_TITLES = ["Seleccionar Ciudad", "Seleccionar Sucursal", "Lista de Ventas"];
 
 const VentasList = () => {
@@ -51,7 +51,8 @@ const VentasList = () => {
 
   const [clientes, setClientes] = useState([]);
   const [empleados, setEmpleados] = useState([]);
-
+  const [showComprobante, setShowComprobante] = useState(false);
+  const [ventaComprobante, setVentaComprobante] = useState(null);
   // 🔐 usuario y permisos
   const { user } = useAuth();
   const rawRoleKey =
@@ -226,12 +227,13 @@ const VentasList = () => {
   const serviceVentasFiltrado = useMemo(() => {
     return {
       ...baseVentasService,
+
       getAll: async (params = {}) => {
-        // Si aún no hay sucursal seleccionada, no pedimos nada
         if (!selectedSucursal?.id) {
           return { items: [], total: 0 };
         }
-        return baseVentasService.getAll({
+
+        return await baseVentasService.getAll({
           ...params,
           sucursalId: selectedSucursal.id,
         });
@@ -260,40 +262,51 @@ const VentasList = () => {
     },
     {
       name: "Cliente",
-      selector: (r) => clienteMap[r.clienteId] ?? `ID: ${r.clienteId}`,
+      selector: (r) => r.clienteNombre || "—",
       sortable: true,
       grow: 1,
       wrap: true,
-      minWidth: "140px",
+      minWidth: "160px",
     },
     {
       name: "Empleado",
-      selector: (r) => empleadoMap[r.empleadoId] ?? `ID: ${r.empleadoId}`,
+      selector: (r) => r.empleadoNombre || "—",
       sortable: true,
       wrap: true,
-      minWidth: "140px",
+      minWidth: "160px",
     },
     {
       name: "Sucursal",
-      selector: (r) => sucursalMap[r.sucursalId] ?? `ID: ${r.sucursalId}`,
+      selector: (r) => r.sucursalNombre || "—",
       sortable: true,
       wrap: true,
-      minWidth: "140px",
+      minWidth: "150px",
     },
     {
       name: "Total (Bs)",
-      selector: (r) => Number(r.total || 0).toFixed(2),
+      selector: (r) => Number(r.total || 0),
       sortable: true,
-      right: true,
       minWidth: "110px",
+      cell: (r) => (
+        <Box sx={{ width: "100%", textAlign: "right", fontWeight: 700 }}>
+          Bs {Number(r.total || 0).toFixed(2)}
+        </Box>
+      ),
     },
     {
       name: "Fecha",
-      selector: (r) =>
-        r.fechaRegistro ? new Date(r.fechaRegistro).toLocaleString() : "",
+      selector: (r) => r.fechaRegistro || "",
       sortable: true,
-      minWidth: "210px",
+      minWidth: "130px",
       wrap: true,
+      cell: (r) => {
+        if (!r.fechaRegistro) return "—";
+
+        const fecha = String(r.fechaRegistro).split("T")[0];
+        const [yyyy, mm, dd] = fecha.split("-");
+
+        return `${dd}/${mm}/${yyyy}`;
+      },
     },
   ];
 
@@ -346,7 +359,16 @@ const VentasList = () => {
     {
       label: "Fecha de registro",
       key: "fechaRegistro",
-      format: (v) => (v ? new Date(v).toLocaleString() : "—"),
+      format: (v) => {
+        if (!v) return "—";
+
+        const fecha = String(v).split("T")[0];
+        const hora = String(v).split("T")[1]?.slice(0, 5);
+
+        const [yyyy, mm, dd] = fecha.split("-");
+
+        return hora ? `${dd}/${mm}/${yyyy} ${hora}` : `${dd}/${mm}/${yyyy}`;
+      },
     },
     {
       label: "Detalle de productos",
@@ -391,9 +413,14 @@ const VentasList = () => {
     setShowForm(true);
   };
 
-  const handleSuccess = () => {
-    gridRef.current?.refetch();
+  const handleSuccess = (ventaDetallada) => {
     setShowForm(false);
+    setVentaComprobante(ventaDetallada);
+    setShowComprobante(true);
+
+    setTimeout(() => {
+      gridRef.current?.refetch?.();
+    }, 100);
   };
 
   const handleCancelVenta = async () => {
@@ -935,6 +962,20 @@ const VentasList = () => {
         />
 
       )}
+      {ventaComprobante && (
+      <Comprobante
+        open={showComprobante}
+        ventaResumen={ventaComprobante}
+        onClose={() => {
+          setShowComprobante(false);
+          setVentaComprobante(null);
+
+          setTimeout(() => {
+            gridRef.current?.refetch?.();
+          }, 100);
+        }}
+      />
+    )}
 
       {idToCancel && canCancel && (
         <DeleteConfirm
