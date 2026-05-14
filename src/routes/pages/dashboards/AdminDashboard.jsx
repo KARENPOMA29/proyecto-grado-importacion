@@ -45,6 +45,7 @@ import VentasList from "@/routes/pages/ventas/ventasList";
 import ProductList from "@/routes/pages/productos/productoList";
 import Reporte_Venta from "@/routes/pages/reportes/Reporte_Venta";
 import Reporte_Inventario from "@/routes/pages/reportes/Reporte_Inventario";
+import Reporte_Importacion from "@/routes/pages/reportes/Reporte_Importacion";
 
 const Reportes = () => (
   <>
@@ -476,6 +477,7 @@ export default function AdminDashboard() {
         <Route path="empleados" element={<EmpleadoList />} />
         <Route path="reportes/ventas" element={<Reporte_Venta />} />
         <Route path="reportes/inventario" element={<Reporte_Inventario />} />
+        <Route path="reportes/Importacion" element={<Reporte_Importacion />} />
         <Route path="configuracion" element={<Configuracion />} />
         <Route path="importaciones" element={<ImportList />} />
         <Route path="inventario" element={<InventarioList />} />

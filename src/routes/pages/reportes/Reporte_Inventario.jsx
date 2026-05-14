@@ -1,1045 +1,1871 @@
-// src/routes/pages/reportes/Reporte_Inventario.jsx
+// src/pages/reportes/Reporte_Inventario.jsx
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Box,
-  Paper,
-  Grid,
-  TextField,
-  MenuItem,
   Button,
-  Typography,
+  Card,
   Chip,
-  Divider,
-  TableContainer,
+  CircularProgress,
+  Grid,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  Paper,
+  Tab,
+  Tabs,
   Table,
+  TableBody,
+  TableCell,
+  TableContainer,
   TableHead,
   TableRow,
-  TableCell,
-  TableBody,
-  IconButton,
-  Stack,
-  LinearProgress,
-  Alert,
-  Tooltip,
-  Card,
-  CardContent,
+  TablePagination,
+  TextField,
+  Typography,
+  Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  FormControlLabel,
 } from "@mui/material";
+
 import {
-  FilterAlt,
-  Refresh,
-  PictureAsPdf,
+  BarChart3,
+  Boxes,
+  CircleAlert,
+  DollarSign,
   Download,
-  Search,
-  Inventory,
-  Warning,
-  Storage,
-  Category,
-} from "@mui/icons-material";
+  FileText,
+  Filter,
+  Package,
+  RefreshCcw,
+  TrendingUp,
+  Warehouse,
+} from "lucide-react";
+
 import { toast } from "react-toastify";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-import ServiceReporteInventario from "@/services/ServiceReporteInventario";
 import ServiceCiudad from "@/services/ServiceCiudad";
 import ServiceSucursal from "@/services/ServiceSucursal";
 import ServiceAlmacen from "@/services/ServiceAlmacen";
-import ServiceSeccion from "@/services/ServiceSeccion";
+import ServiceCategoria from "@/services/ServiceCategoria";
+import ServiceModelo from "@/services/ServiceModeloProducto";
+import ServiceProveedor from "@/services/ServiceProveedor";
+import ServiceReporteInventario from "@/services/ServiceReporteInventario";
 
-const Reporte_Inventario = () => {
-  // ================== FILTROS ==================
-  const [filtros, setFiltros] = useState({
-    fecha_desde: "",
-    fecha_hasta: "",
-    ciudad_id: "",
-    sucursal_id: "",
-    almacen_id: "",
-    seccion_id: "",
-  });
+const money = (value) => `Bs ${Number(value || 0).toFixed(2)}`;
+const normalizeList = (res) => {
+  if (Array.isArray(res)) {
+    return { items: res, total: res.length };
+  }
 
-  // ================== CATALOGOS ==================
-  const [ciudades, setCiudades] = useState([]);
-  const [sucursales, setSucursales] = useState([]);
-  const [almacenes, setAlmacenes] = useState([]);
-  const [secciones, setSecciones] = useState([]);
-
-  // ================== DATOS REPORTE ==================
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingCatalogos, setLoadingCatalogos] = useState(false);
-
-  // ================== CARGAR CATALOGOS ==================
-  useEffect(() => {
-    const cargarCatalogos = async () => {
-      try {
-        setLoadingCatalogos(true);
-        const [resCiu, resSuc, resAlm, resSec] = await Promise.all([
-          ServiceCiudad.getAll(),
-          ServiceSucursal.getAll(),
-          ServiceAlmacen.getAll(),
-          ServiceSeccion.getAll(),
-        ]);
-
-        // aseguramos siempre arrays
-        setCiudades(
-          Array.isArray(resCiu) ? resCiu : resCiu?.data || resCiu?.items || []
-        );
-        setSucursales(
-          Array.isArray(resSuc) ? resSuc : resSuc?.data || resSuc?.items || []
-        );
-        setAlmacenes(
-          Array.isArray(resAlm) ? resAlm : resAlm?.data || resAlm?.items || []
-        );
-        setSecciones(
-          Array.isArray(resSec) ? resSec : resSec?.data || resSec?.items || []
-        );
-      } catch (err) {
-        console.error(err);
-        toast.error("Error cargando catálogos para el reporte de inventario");
-      } finally {
-        setLoadingCatalogos(false);
-      }
-    };
-
-    cargarCatalogos();
-  }, []);
-
-  // ================== MANEJO FILTROS ==================
-  const handleFiltroChange = (e) => {
-    const { name, value } = e.target;
-
-    setFiltros((prev) => ({
-      ...prev,
-      [name]: value,
-      ...(name === "ciudad_id"
-        ? { sucursal_id: "", almacen_id: "", seccion_id: "" }
-        : {}),
-      ...(name === "sucursal_id"
-        ? { almacen_id: "", seccion_id: "" }
-        : {}),
-      ...(name === "almacen_id"
-        ? { seccion_id: "" }
-        : {}),
-    }));
+  return {
+    items: res?.items || res?.data || [],
+    total: res?.total ?? res?.count ?? res?.items?.length ?? res?.data?.length ?? 0,
   };
+};
+const BRAND = {
+  light: "#e4e0e1",
+  gray: "#7f7f7f",
+  red: "#a4193d",
+  dark: "#1f2329",
+  white: "#ffffff",
+};
 
-  // ================== FILTRADOS DEPENDIENTES ==================
-  const sucursalesFiltradas = useMemo(() => {
-    if (!filtros.ciudad_id) return sucursales;
-    return sucursales.filter(
-      (s) => String(s.idCiudad) === String(filtros.ciudad_id)
-    );
-  }, [sucursales, filtros.ciudad_id]);
+const COLORS = {
+  primary: [164, 25, 61],
+  dark: [31, 35, 41],
+  light: [228, 224, 225],
+  gray: [127, 127, 127],
+};
+const fieldStyle = {
+  minWidth: 170,
+  "& .MuiOutlinedInput-root": {
+    borderRadius: 2,
+    bgcolor: "white",
+    minHeight: 42,
+  },
+  "& .MuiInputLabel-root": {
+    fontSize: 14,
+  },
+};
 
-  const almacenesFiltrados = useMemo(() => {
-    if (!filtros.sucursal_id) return almacenes;
-    return almacenes.filter(
-      (a) => String(a.sucursalId) === String(filtros.sucursal_id)
-    );
-  }, [almacenes, filtros.sucursal_id]);
 
-  const seccionesFiltradas = useMemo(() => {
-    if (!filtros.almacen_id) return secciones;
-    return secciones.filter(
-      (s) => String(s.almacenId) === String(filtros.almacen_id)
-    );
-  }, [secciones, filtros.almacen_id]);
 
-  // ================== BUSCAR REPORTE ==================
-  const handleBuscar = async () => {
-    try {
-      setLoading(true);
-      const data = await ServiceReporteInventario.getReporteInventario(filtros);
-      setRows(data || []);
-      if (!data || data.length === 0) {
-        toast.info("No se encontraron registros de inventario con esos filtros");
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Error obteniendo reporte de inventario");
-    } finally {
-      setLoading(false);
-    }
-  };
+const entradaTabs = [
+  "Detalle completo",
+  "Resumen diario",
+  "Sucursal / Almacén",
+  "Productos",
+  "Importaciones",
+  "Proveedores",
+  "Observados",
+];
 
-  // ================== LIMPIAR ==================
-  const handleLimpiar = () => {
-    setFiltros({
-      fecha_desde: "",
-      fecha_hasta: "",
-      ciudad_id: "",
-      sucursal_id: "",
-      almacen_id: "",
-      seccion_id: "",
-    });
-    setRows([]);
-  };
+const stockTabs = ["Stock agrupado", "Productos disponibles"];
 
-  // ================== RESUMEN DETALLADO ==================
-  const resumen = useMemo(() => {
-    let totalModelos = rows.length;
-    let sumaStockActual = 0;
-    let sumaStockMinimo = 0;
-    let modelosBajoStock = 0;
-    let modelosSinStock = 0;
-    let valorTotalInventario = 0;
-    
-    // Agrupar por categorías para análisis
-    const categoriasMap = new Map();
-    const marcasMap = new Map();
+const defaultPagination = {
+  porDia: { page: 0, pageSize: 20, total: 0 },
+  porSucursal: { page: 0, pageSize: 20, total: 0 },
+  porProducto: { page: 0, pageSize: 20, total: 0 },
+  porImportacion: { page: 0, pageSize: 20, total: 0 },
+  porProveedor: { page: 0, pageSize: 20, total: 0 },
+  observados: { page: 0, pageSize: 20, total: 0 },
+  stockActual: { page: 0, pageSize: 20, total: 0 },
+};
 
-    rows.forEach((r) => {
-      const actual = Number(r.stockActual ?? 0);
-      const minimo = Number(r.stockMinimo ?? 0);
-      const precioPromedio = Number(r.precioPromedio ?? 0);
-      
-      sumaStockActual += actual;
-      sumaStockMinimo += minimo;
-      valorTotalInventario += actual * precioPromedio;
+const tabStyle = {
+  px: 2,
+  mt: 1,
+  borderBottom: "1px solid #eee",
+  "& .MuiTab-root": {
+    textTransform: "none",
+    fontWeight: 700,
+  },
+  "& .Mui-selected": {
+    color: "#592B2B !important",
+  },
+  "& .MuiTabs-indicator": {
+    bgcolor: "#592B2B",
+  },
+};
 
-      if (actual < minimo) {
-        modelosBajoStock += 1;
-      }
-      if (actual === 0) {
-        modelosSinStock += 1;
-      }
+const SimpleTable = ({
+  rows = [],
+  columns = [],
+  empty = "Sin datos",
+  loading = false,
+  total = 0,
+  page = 0,
+  rowsPerPage = 20,
+  onPageChange,
+  onRowsPerPageChange,
+}) => {
+  const showPagination =
+    typeof onPageChange === "function" &&
+    typeof onRowsPerPageChange === "function";
 
-      // Agrupar por categoría
-      const categoria = r.categoriaNombre || "Sin categoría";
-      const catActual = categoriasMap.get(categoria) || { count: 0, stock: 0 };
-      categoriasMap.set(categoria, {
-        count: catActual.count + 1,
-        stock: catActual.stock + actual,
-      });
-
-      // Agrupar por marca
-      const marca = r.marcaNombre || "Sin marca";
-      const marcaActual = marcasMap.get(marca) || { count: 0, stock: 0 };
-      marcasMap.set(marca, {
-        count: marcaActual.count + 1,
-        stock: marcaActual.stock + actual,
-      });
-    });
-
-    // Ordenar categorías por cantidad
-    const categoriasOrdenadas = Array.from(categoriasMap.entries())
-      .map(([nombre, data]) => ({ nombre, ...data }))
-      .sort((a, b) => b.count - a.count);
-
-    // Ordenar marcas por cantidad
-    const marcasOrdenadas = Array.from(marcasMap.entries())
-      .map(([nombre, data]) => ({ nombre, ...data }))
-      .sort((a, b) => b.count - a.count);
-
-    return {
-      totalModelos,
-      sumaStockActual,
-      sumaStockMinimo,
-      modelosBajoStock,
-      modelosSinStock,
-      valorTotalInventario,
-      topCategorias: categoriasOrdenadas.slice(0, 5),
-      topMarcas: marcasOrdenadas.slice(0, 5),
-    };
-  }, [rows]);
-
-  // ================== CHIPS FILTROS ACTIVOS ==================
-  const chipsFiltros = useMemo(() => {
-    const chips = [];
-
-    if (filtros.fecha_desde || filtros.fecha_hasta) {
-      chips.push(
-        `Fecha: ${filtros.fecha_desde || "∞"} - ${filtros.fecha_hasta || "∞"}`
-      );
-    }
-
-    if (filtros.ciudad_id) {
-      const ciu = ciudades.find(
-        (c) => String(c.id) === String(filtros.ciudad_id)
-      );
-      if (ciu) chips.push(`Ciudad: ${ciu.nombre || ciu.Nombre}`);
-    }
-
-    if (filtros.sucursal_id) {
-      const suc = sucursales.find(
-        (s) => String(s.id) === String(filtros.sucursal_id)
-      );
-      if (suc) chips.push(`Sucursal: ${suc.nombre}`);
-    }
-
-    if (filtros.almacen_id) {
-      const alm = almacenes.find(
-        (a) => String(a.id) === String(filtros.almacen_id)
-      );
-      if (alm) chips.push(`Almacén: ${alm.nombre}`);
-    }
-
-    if (filtros.seccion_id) {
-      const sec = secciones.find(
-        (s) => String(s.id) === String(filtros.seccion_id)
-      );
-      if (sec) chips.push(`Sección: ${sec.nombre}`);
-    }
-
-    return chips;
-  }, [filtros, ciudades, sucursales, almacenes, secciones]);
-
-  // ================== EXPORTAR PDF ==================
-  const handleExportPDF = () => {
-    if (!rows.length) {
-      toast.info("No hay datos para exportar");
-      return;
-    }
-
-    try {
-      // Crear documento PDF
-      const doc = new jsPDF({
-        orientation: "landscape",
-        unit: "mm",
-        format: "a4",
-      });
-
-      // Título del reporte
-      const fechaGeneracion = new Date().toLocaleDateString();
-      const horaGeneracion = new Date().toLocaleTimeString();
-      
-      doc.setFontSize(18);
-      doc.setTextColor(33, 33, 33);
-      doc.text("REPORTE DE INVENTARIO", 14, 15);
-      
-      doc.setFontSize(10);
-      doc.setTextColor(100, 100, 100);
-      doc.text(`Generado el: ${fechaGeneracion} ${horaGeneracion}`, 14, 22);
-      doc.text(`Total de registros: ${resumen.totalModelos}`, 14, 28);
-      
-      // Información de filtros aplicados
-      if (chipsFiltros.length > 0) {
-        doc.setFontSize(9);
-        let yPos = 34;
-        chipsFiltros.forEach((filtro) => {
-          doc.text(`• ${filtro}`, 14, yPos);
-          yPos += 4;
-        });
-        yPos += 2;
-      }
-
-      // Alertas de stock crítico
-      if (resumen.modelosBajoStock > 0 || resumen.modelosSinStock > 0) {
-        const alertY = chipsFiltros.length > 0 ? 34 + (chipsFiltros.length * 4) + 2 : 34;
-        doc.setFontSize(10);
-        doc.setTextColor(211, 47, 47);
-        if (resumen.modelosBajoStock > 0) {
-          doc.text(`⚠ ${resumen.modelosBajoStock} modelos con stock por debajo del mínimo`, 14, alertY);
-        }
-        if (resumen.modelosSinStock > 0) {
-          doc.text(`⚠ ${resumen.modelosSinStock} modelos sin stock disponible`, 14, alertY + 5);
-        }
-      }
-
-      // Preparar datos para la tabla
-      const tableColumn = [
-        "Ciudad",
-        "Sucursal",
-        "Almacén",
-        "Sección",
-        "Modelo",
-        "Marca",
-        "Categoría",
-        "Color",
-        "Unidad",
-        "Stock Actual",
-        "Stock Mínimo",
-        "Estado",
-      ];
-
-      const tableRows = rows.map((row) => {
-        const stockActual = Number(row.stockActual ?? 0);
-        const stockMinimo = Number(row.stockMinimo ?? 0);
-        let estado = "Normal";
-        let estadoColor = [33, 150, 83]; // Verde
-        
-        if (stockActual === 0) {
-          estado = "Sin Stock";
-          estadoColor = [211, 47, 47]; // Rojo
-        } else if (stockMinimo > 0 && stockActual < stockMinimo) {
-          estado = "Bajo Stock";
-          estadoColor = [255, 152, 0]; // Naranja
-        }
-
-        return [
-          row.ciudadNombre || "",
-          row.sucursalNombre || "",
-          row.almacenNombre || "",
-          row.seccionNombre || "",
-          row.modeloNombre || "",
-          row.marcaNombre || "",
-          row.categoriaNombre || "",
-          row.modeloColor || "",
-          row.unidadMedida || "",
-          stockActual.toFixed(2),
-          stockMinimo.toFixed(2),
-          estado,
-        ];
-      });
-
-      // Agregar tabla
-      autoTable(doc, {
-        head: [tableColumn],
-        body: tableRows,
-        startY: chipsFiltros.length > 0 ? 45 + (chipsFiltros.length * 4) : 45,
-        theme: "grid",
-        styles: { 
-          fontSize: 8, 
-          cellPadding: 2,
-          overflow: 'linebreak'
-        },
-        headStyles: { 
-          fillColor: [41, 128, 185], 
-          textColor: 255, 
-          fontSize: 9,
-          fontStyle: 'bold'
-        },
-        alternateRowStyles: { fillColor: [245, 245, 245] },
-        margin: { top: 10 },
-        didParseCell: function(data) {
-          // Colorear celda de estado
-          if (data.column.index === 11 && data.cell.raw === "Sin Stock") {
-            data.cell.styles.fillColor = [211, 47, 47];
-            data.cell.styles.textColor = 255;
-          } else if (data.column.index === 11 && data.cell.raw === "Bajo Stock") {
-            data.cell.styles.fillColor = [255, 152, 0];
-            data.cell.styles.textColor = 255;
-          }
-        },
-        columnStyles: {
-          9: { halign: 'right' },
-          10: { halign: 'right' },
-          11: { cellWidth: 20 }
-        }
-      });
-
-      // Agregar resumen al final
-      const finalY = doc.lastAutoTable.finalY || 100;
-      doc.setFontSize(10);
-      doc.setTextColor(0, 0, 0);
-      
-      doc.text("RESUMEN DEL INVENTARIO", 14, finalY + 10);
-      doc.setFontSize(9);
-      doc.text(`• Total de modelos: ${resumen.totalModelos}`, 14, finalY + 17);
-      doc.text(`• Stock total actual: ${resumen.sumaStockActual.toFixed(2)} unidades`, 14, finalY + 22);
-      doc.text(`• Stock mínimo requerido: ${resumen.sumaStockMinimo.toFixed(2)} unidades`, 14, finalY + 27);
-      doc.text(`• Valor estimado del inventario: S/. ${resumen.valorTotalInventario.toFixed(2)}`, 14, finalY + 32);
-      doc.text(`• Modelos bajo stock: ${resumen.modelosBajoStock}`, 14, finalY + 37);
-      doc.text(`• Modelos sin stock: ${resumen.modelosSinStock}`, 14, finalY + 42);
-
-      // Top categorías
-      if (resumen.topCategorias.length > 0) {
-        doc.text("TOP 5 CATEGORÍAS:", 100, finalY + 10);
-        let yCat = finalY + 17;
-        resumen.topCategorias.forEach((cat, idx) => {
-          doc.text(`${idx + 1}. ${cat.nombre}: ${cat.count} modelos`, 100, yCat);
-          yCat += 5;
-        });
-      }
-
-      // Guardar PDF
-      const nombreArchivo = `Reporte_Inventario_${new Date().toISOString().slice(0, 10)}.pdf`;
-      doc.save(nombreArchivo);
-      
-      toast.success("PDF generado exitosamente");
-    } catch (error) {
-      console.error("Error generando PDF:", error);
-      toast.error("Error al generar el PDF");
-    }
-  };
-
-  // ================== EXPORTAR EXCEL ==================
-  const handleExportExcel = () => {
-    if (!rows.length) {
-      toast.info("No hay datos para exportar");
-      return;
-    }
-    
-    // Implementación básica para Excel (CSV)
-    const headers = [
-      "Ciudad",
-      "Sucursal",
-      "Almacén",
-      "Sección",
-      "Modelo",
-      "Marca",
-      "Categoría",
-      "Capacidad/Tamaño",
-      "Color",
-      "Unidad",
-      "Stock Actual",
-      "Stock Mínimo",
-      "Precio Promedio",
-      "Estado"
-    ];
-    
-    const csvData = rows.map(row => {
-      const stockActual = Number(row.stockActual ?? 0);
-      const stockMinimo = Number(row.stockMinimo ?? 0);
-      let estado = "Normal";
-      if (stockActual === 0) estado = "Sin Stock";
-      else if (stockMinimo > 0 && stockActual < stockMinimo) estado = "Bajo Stock";
-      
-      return [
-        row.ciudadNombre || "",
-        row.sucursalNombre || "",
-        row.almacenNombre || "",
-        row.seccionNombre || "",
-        row.modeloNombre || "",
-        row.marcaNombre || "",
-        row.categoriaNombre || "",
-        row.capacidadOTamano || "",
-        row.modeloColor || "",
-        row.unidadMedida || "",
-        stockActual.toFixed(2),
-        stockMinimo.toFixed(2),
-        Number(row.precioPromedio ?? 0).toFixed(2),
-        estado
-      ];
-    });
-    
-    const csvContent = [
-      headers.join(","),
-      ...csvData.map(row => row.join(","))
-    ].join("\n");
-    
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Reporte_Inventario_${new Date().toISOString().slice(0, 10)}.csv`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    toast.success("CSV exportado exitosamente");
-  };
-
-  // =================================================================
-  // ======================== RENDER =================================
-  // =================================================================
   return (
-    <Box p={3}>
-      {/* Header */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box display="flex" alignItems="center" gap={2}>
-          <Inventory sx={{ fontSize: 40, color: "primary.main" }} />
-          <Box>
-            <Typography variant="h4" fontWeight="bold" color="primary">
-              Reporte de Inventario
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Gestión y control de existencias
-            </Typography>
-          </Box>
-        </Box>
-        <Stack direction="row" spacing={1}>
-          <Button
-            variant="outlined"
-            startIcon={<Download />}
-            onClick={handleExportExcel}
-            disabled={!rows.length}
-            size="large"
-          >
-            Excel
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<PictureAsPdf />}
-            onClick={handleExportPDF}
-            disabled={!rows.length}
-            size="large"
-            sx={{ bgcolor: "#d32f2f", "&:hover": { bgcolor: "#b71c1c" } }}
-          >
-            PDF
-          </Button>
-        </Stack>
-      </Box>
-
-      {/* Alertas críticas */}
-      {(resumen.modelosBajoStock > 0 || resumen.modelosSinStock > 0) && (
-        <Alert 
-          severity="warning" 
-          sx={{ mb: 3 }}
-          icon={<Warning />}
-        >
-          <Typography variant="subtitle2">
-            {resumen.modelosBajoStock > 0 && `${resumen.modelosBajoStock} modelos con stock por debajo del mínimo`}
-            {resumen.modelosBajoStock > 0 && resumen.modelosSinStock > 0 && ' • '}
-            {resumen.modelosSinStock > 0 && `${resumen.modelosSinStock} modelos sin stock disponible`}
-          </Typography>
-        </Alert>
-      )}
-
-      {/* Panel de Filtros */}
-      <Paper 
-        elevation={2} 
-        sx={{ 
-          p: 3, 
-          mb: 3, 
-          borderRadius: 2,
-          background: "linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%)"
-        }}
+    <Box>
+      <TableContainer
+        component={Paper}
+        elevation={0}
+        sx={{ maxHeight: 620, borderRadius: 0 }}
       >
-        <Typography variant="h6" gutterBottom color="primary" fontWeight="medium">
-          Filtros de Búsqueda
-        </Typography>
-        
-        {loadingCatalogos && <LinearProgress sx={{ mb: 2 }} />}
-        
-        <Grid container spacing={2}>
-          {/* Fechas */}
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              fullWidth
-              label="Fecha Desde"
-              type="date"
-              name="fecha_desde"
-              value={filtros.fecha_desde}
-              onChange={handleFiltroChange}
-              InputLabelProps={{ shrink: true }}
-              size="medium"
-              variant="outlined"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              fullWidth
-              label="Fecha Hasta"
-              type="date"
-              name="fecha_hasta"
-              value={filtros.fecha_hasta}
-              onChange={handleFiltroChange}
-              InputLabelProps={{ shrink: true }}
-              size="medium"
-              variant="outlined"
-            />
-          </Grid>
-
-          {/* Ciudad */}
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              select
-              fullWidth
-              label="Ciudad"
-              name="ciudad_id"
-              value={filtros.ciudad_id}
-              onChange={handleFiltroChange}
-              size="medium"
-              variant="outlined"
-              SelectProps={{
-                MenuProps: {
-                  PaperProps: {
-                    style: {
-                      maxHeight: 300,
-                    },
-                  },
-                },
-              }}
-            >
-              <MenuItem value="">-- Todas las ciudades --</MenuItem>
-              {(ciudades || []).map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.nombre || c.Nombre}
-                </MenuItem>
+        <Table stickyHeader size="small">
+          <TableHead>
+            <TableRow>
+              {columns.map(([key, label]) => (
+                <TableCell
+                  key={key}
+                  sx={{
+                    fontWeight: 800,
+                    bgcolor: "#faf7f7",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {label}
+                </TableCell>
               ))}
-            </TextField>
-          </Grid>
+            </TableRow>
+          </TableHead>
 
-          {/* Sucursal */}
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              select
-              fullWidth
-              label="Sucursal"
-              name="sucursal_id"
-              value={filtros.sucursal_id}
-              onChange={handleFiltroChange}
-              size="medium"
-              variant="outlined"
-              disabled={!filtros.ciudad_id && sucursalesFiltradas.length === 0}
-            >
-              <MenuItem value="">-- Todas las sucursales --</MenuItem>
-              {(sucursalesFiltradas || []).map((s) => (
-                <MenuItem key={s.id} value={s.id}>
-                  {s.nombre}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          {/* Almacén */}
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              select
-              fullWidth
-              label="Almacén"
-              name="almacen_id"
-              value={filtros.almacen_id}
-              onChange={handleFiltroChange}
-              size="medium"
-              variant="outlined"
-              disabled={!filtros.sucursal_id && almacenesFiltrados.length === 0}
-            >
-              <MenuItem value="">-- Todos los almacenes --</MenuItem>
-              {(almacenesFiltrados || []).map((a) => (
-                <MenuItem key={a.id} value={a.id}>
-                  {a.nombre}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          {/* Sección */}
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              select
-              fullWidth
-              label="Sección"
-              name="seccion_id"
-              value={filtros.seccion_id}
-              onChange={handleFiltroChange}
-              size="medium"
-              variant="outlined"
-              disabled={!filtros.almacen_id && seccionesFiltradas.length === 0}
-            >
-              <MenuItem value="">-- Todas las secciones --</MenuItem>
-              {(seccionesFiltradas || []).map((s) => (
-                <MenuItem key={s.id} value={s.id}>
-                  {s.nombre}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          {/* Botones de Acción */}
-          <Grid item xs={12}>
-            <Box display="flex" justifyContent="flex-end" gap={2} mt={1}>
-              <Button
-                variant="outlined"
-                startIcon={<Refresh />}
-                onClick={handleLimpiar}
-                size="large"
-              >
-                Limpiar
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<Search />}
-                onClick={handleBuscar}
-                disabled={loading}
-                size="large"
-                sx={{ minWidth: 150 }}
-              >
-                {loading ? "Buscando..." : "Buscar"}
-              </Button>
-            </Box>
-          </Grid>
-        </Grid>
-
-        {/* Chips de filtros activos */}
-        {chipsFiltros.length > 0 && (
-          <>
-            <Divider sx={{ my: 3 }} />
-            <Box>
-              <Typography variant="subtitle2" gutterBottom color="textSecondary">
-                Filtros aplicados:
-              </Typography>
-              <Box display="flex" flexWrap="wrap" gap={1}>
-                {chipsFiltros.map((txt) => (
-                  <Chip
-                    key={txt}
-                    label={txt}
-                    variant="outlined"
-                    color="primary"
-                    size="medium"
-                  />
-                ))}
-              </Box>
-            </Box>
-          </>
-        )}
-      </Paper>
-
-      {/* Resumen con tarjetas */}
-      <Grid container spacing={2} mb={3}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Total Modelos
-                  </Typography>
-                  <Typography variant="h4" fontWeight="bold">
-                    {resumen.totalModelos}
-                  </Typography>
-                </Box>
-                <Inventory color="primary" sx={{ fontSize: 40 }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Stock Total
-                  </Typography>
-                  <Typography variant="h4" fontWeight="bold" color="success.main">
-                    {resumen.sumaStockActual.toFixed(0)}
-                  </Typography>
-                </Box>
-                <Storage color="success" sx={{ fontSize: 40 }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Bajo Stock
-                  </Typography>
-                  <Typography variant="h4" fontWeight="bold" color="warning.main">
-                    {resumen.modelosBajoStock}
-                  </Typography>
-                </Box>
-                <Warning color="warning" sx={{ fontSize: 40 }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Valor Inventario
-                  </Typography>
-                  <Typography variant="h4" fontWeight="bold" color="info.main">
-                    S/. {resumen.valorTotalInventario.toFixed(0)}
-                  </Typography>
-                </Box>
-                <Category color="info" sx={{ fontSize: 40 }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Análisis de categorías y marcas */}
-      <Grid container spacing={2} mb={3}>
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="subtitle1" gutterBottom fontWeight="medium">
-              Top 5 Categorías
-            </Typography>
-            {resumen.topCategorias.length > 0 ? (
-              resumen.topCategorias.map((cat, idx) => (
-                <Box key={cat.nombre} display="flex" justifyContent="space-between" mb={1}>
-                  <Typography variant="body2">
-                    {idx + 1}. {cat.nombre}
-                  </Typography>
-                  <Typography variant="body2" fontWeight="medium">
-                    {cat.count} modelos
-                  </Typography>
-                </Box>
-              ))
-            ) : (
-              <Typography variant="body2" color="text.secondary">
-                No hay datos de categorías
-              </Typography>
-            )}
-          </Paper>
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="subtitle1" gutterBottom fontWeight="medium">
-              Top 5 Marcas
-            </Typography>
-            {resumen.topMarcas.length > 0 ? (
-              resumen.topMarcas.map((marca, idx) => (
-                <Box key={marca.nombre} display="flex" justifyContent="space-between" mb={1}>
-                  <Typography variant="body2">
-                    {idx + 1}. {marca.nombre}
-                  </Typography>
-                  <Typography variant="body2" fontWeight="medium">
-                    {marca.count} modelos
-                  </Typography>
-                </Box>
-              ))
-            ) : (
-              <Typography variant="body2" color="text.secondary">
-                No hay datos de marcas
-              </Typography>
-            )}
-          </Paper>
-        </Grid>
-      </Grid>
-
-      {/* Tabla de Resultados */}
-      <Paper elevation={2} sx={{ borderRadius: 2, overflow: "hidden" }}>
-        {loading && <LinearProgress />}
-        
-        <TableContainer sx={{ maxHeight: 600 }}>
-          <Table stickyHeader size="medium">
-            <TableHead>
+          <TableBody>
+            {loading ? (
               <TableRow>
-                <TableCell sx={{ bgcolor: "primary.main", color: "white", fontWeight: "bold" }}>
-                  Ubicación
-                </TableCell>
-                <TableCell sx={{ bgcolor: "primary.main", color: "white", fontWeight: "bold" }}>
-                  Producto
-                </TableCell>
-                <TableCell sx={{ bgcolor: "primary.main", color: "white", fontWeight: "bold" }}>
-                  Especificaciones
-                </TableCell>
-                <TableCell align="right" sx={{ bgcolor: "primary.main", color: "white", fontWeight: "bold" }}>
-                  Stock
+                <TableCell colSpan={columns.length} align="center" sx={{ py: 8 }}>
+                  <CircularProgress size={32} />
                 </TableCell>
               </TableRow>
-            </TableHead>
-            <TableBody>
-              {rows.map((row, idx) => {
-                const stockActual = Number(row.stockActual ?? 0);
-                const stockMinimo = Number(row.stockMinimo ?? 0);
-                const bajoStock = stockMinimo > 0 && stockActual < stockMinimo;
-                const sinStock = stockActual === 0;
+            ) : rows.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  align="center"
+                  sx={{ py: 8, color: "text.secondary" }}
+                >
+                  {empty}
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((row, index) => (
+                <TableRow
+                  key={`${page}-${rowsPerPage}-${index}-${
+                    row.movimientoId ||
+                    row.productoId ||
+                    row.numeroSerie ||
+                    row.importacionId ||
+                    row.proveedorId ||
+                    row.modeloId ||
+                    row.sucursalId ||
+                    row.almacenId ||
+                    "row"
+                  }`}
+                  hover
+                >
+                  {columns.map(([key, , format]) => {
+                    const value = row[key];
 
-                return (
-                  <TableRow
-                    key={`${row.modeloId}-${row.seccionId}-${idx}`}
-                    hover
-                    sx={{
-                      '&:last-child td, &:last-child th': { border: 0 },
-                      bgcolor: sinStock ? 'rgba(211, 47, 47, 0.1)' : 
-                               bajoStock ? 'rgba(255, 152, 0, 0.1)' : 'inherit'
-                    }}
-                  >
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2" fontWeight="medium">
-                          {row.ciudadNombre}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {row.sucursalNombre} / {row.almacenNombre}
-                        </Typography>
-                        <Typography variant="caption" display="block" color="text.secondary">
-                          Sección: {row.seccionNombre}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2" fontWeight="medium">
-                          {row.modeloNombre}
-                        </Typography>
-                        <Typography variant="caption" display="block" color="text.secondary">
-                          Marca: {row.marcaNombre}
-                        </Typography>
-                        <Typography variant="caption" display="block" color="text.secondary">
-                          Categoría: {row.categoriaNombre}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2">
-                          {row.capacidadOTamano}
-                        </Typography>
-                        <Typography variant="caption" display="block" color="text.secondary">
-                          Color: {row.modeloColor}
-                        </Typography>
-                        <Typography variant="caption" display="block" color="text.secondary">
-                          Unidad: {row.unidadMedida}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Box>
-                        <Tooltip title={bajoStock ? "Stock por debajo del mínimo" : sinStock ? "Sin stock disponible" : "Stock normal"}>
-                          <Chip
-                            label={`${stockActual.toFixed(2)} / ${stockMinimo.toFixed(2)}`}
-                            size="small"
-                            color={
-                              sinStock ? "error" : 
-                              bajoStock ? "warning" : "success"
-                            }
-                            variant="outlined"
-                          />
-                        </Tooltip>
-                        <Typography variant="caption" display="block" color="text.secondary" mt={0.5}>
-                          {sinStock ? "SIN STOCK" : bajoStock ? "BAJO STOCK" : "NORMAL"}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-
-              {rows.length === 0 && !loading && (
-                <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 5 }}>
-                    <Box py={3}>
-                      <Typography variant="h6" color="textSecondary" gutterBottom>
-                        No hay datos de inventario
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        Aplica filtros y haz clic en "Buscar" para ver el inventario
-                      </Typography>
-                    </Box>
-                  </TableCell>
+                    return (
+                      <TableCell key={key} sx={{ whiteSpace: "nowrap" }}>
+                        {format ? format(value, row) : value ?? "—"}
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
-      {/* Footer con resumen */}
-      {rows.length > 0 && (
-        <Paper elevation={1} sx={{ mt: 2, p: 2, borderRadius: 2 }}>
-          <Grid container spacing={2} justifyContent="space-between">
-            <Grid item xs={12} md={4}>
-              <Typography variant="subtitle2" color="text.secondary">
-                Relación stock actual/mínimo:
-              </Typography>
-              <Typography variant="h6" fontWeight="bold" color={resumen.sumaStockActual < resumen.sumaStockMinimo ? "error" : "success"}>
-                {resumen.sumaStockActual.toFixed(0)} / {resumen.sumaStockMinimo.toFixed(0)}
-              </Typography>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Typography variant="subtitle2" color="text.secondary">
-                Porcentaje bajo stock:
-              </Typography>
-              <Typography variant="h6" fontWeight="bold" color={resumen.modelosBajoStock > 0 ? "warning" : "success"}>
-                {((resumen.modelosBajoStock / resumen.totalModelos) * 100).toFixed(1)}%
-              </Typography>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Typography variant="subtitle2" color="text.secondary" textAlign="right">
-                Valor total estimado:
-              </Typography>
-              <Typography variant="h5" fontWeight="bold" color="primary" textAlign="right">
-                S/. {resumen.valorTotalInventario.toFixed(2)}
-              </Typography>
-            </Grid>
-          </Grid>
-        </Paper>
+      {showPagination && (
+        <TablePagination
+          component="div"
+          count={total}
+          page={page}
+          rowsPerPage={rowsPerPage}
+          onPageChange={(_, newPage) => onPageChange(newPage)}
+          onRowsPerPageChange={(e) => {
+            onRowsPerPageChange(parseInt(e.target.value, 10));
+            onPageChange(0);
+          }}
+          rowsPerPageOptions={[10, 20, 50, 100]}
+          labelRowsPerPage="Filas por página"
+          labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
+          sx={{ borderTop: "1px solid #eee", bgcolor: "#fff" }}
+        />
       )}
     </Box>
   );
 };
 
-export default Reporte_Inventario;
+export default function Reporte_Inventario() {
+  const [mainTab, setMainTab] = useState(0);
+  const [entradaTab, setEntradaTab] = useState(0);
+  const [stockTab, setStockTab] = useState(0);
+
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const [dashboardEntradas, setDashboardEntradas] = useState({});
+  const [dashboardStock, setDashboardStock] = useState({});
+
+  const [detalle, setDetalle] = useState([]);
+  const [porDia, setPorDia] = useState([]);
+  const [porSucursal, setPorSucursal] = useState([]);
+  const [porProducto, setPorProducto] = useState([]);
+  const [porImportacion, setPorImportacion] = useState([]);
+  const [porProveedor, setPorProveedor] = useState([]);
+  const [observados, setObservados] = useState([]);
+
+  const [stockActual, setStockActual] = useState([]);
+  const [stockDetalle, setStockDetalle] = useState([]);
+
+  const [exportAnchorEl, setExportAnchorEl] = useState(null);
+  const [openExportDialog, setOpenExportDialog] = useState(false);
+  const [selectedExports, setSelectedExports] = useState([]);
+  const openExportMenu = Boolean(exportAnchorEl);
+
+  const [ciudades, setCiudades] = useState([]);
+  const [sucursales, setSucursales] = useState([]);
+  const [almacenes, setAlmacenes] = useState([]);
+  const [categorias, setCategorias] = useState([]);
+  const [modelos, setModelos] = useState([]);
+  const [proveedores, setProveedores] = useState([]);
+
+  const [detalleTotal, setDetalleTotal] = useState(0);
+  const [stockDetalleTotal, setStockDetalleTotal] = useState(0);
+
+  const [detallePage, setDetallePage] = useState(0);
+  const [detallePageSize, setDetallePageSize] = useState(20);
+
+  const [stockDetallePage, setStockDetallePage] = useState(0);
+  const [stockDetallePageSize, setStockDetallePageSize] = useState(20);
+
+  const [tablePagination, setTablePagination] = useState(defaultPagination);
+
+  const [filters, setFilters] = useState({
+    search: "",
+    fechaDesde: "",
+    fechaHasta: "",
+    ciudadId: "",
+    sucursalId: "",
+    almacenId: "",
+    categoriaId: "",
+    modeloId: "",
+    proveedorId: "",
+    observado: "",
+  });
+
+  // ============================================================
+  // DETERMINAR FILTROS ACTIVOS SEGÚN TAB Y SUBTAB
+  // ============================================================
+  const getActiveFilters = () => {
+    if (mainTab === 0) {
+      // ENTRADAS - Todos los filtros disponibles
+      return [
+        "search",
+        "fechaDesde",
+        "fechaHasta",
+        "ciudadId",
+        "sucursalId",
+        "almacenId",
+        "categoriaId",
+        "modeloId",
+        "proveedorId",
+        "observado",
+      ];
+    }
+
+    if (mainTab === 1) {
+      if (stockTab === 0) {
+        // STOCK AGRUPADO - Solo filtros básicos
+        return [
+          "search",
+          "ciudadId",
+          "sucursalId",
+          "almacenId",
+          "categoriaId",
+          "modeloId",
+        ];
+      }
+
+      if (stockTab === 1) {
+        // STOCK DETALLE - Todos excepto importación
+        return [
+          "search",
+          "fechaDesde",
+          "fechaHasta",
+          "ciudadId",
+          "sucursalId",
+          "almacenId",
+          "categoriaId",
+          "modeloId",
+          "proveedorId",
+          "observado",
+        ];
+      }
+    }
+
+    return [];
+  };
+
+
+
+  const handleTablePageChange = (key, page) => {
+    setTablePagination((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        page,
+      },
+    }));
+  };
+
+  const handleTablePageSizeChange = (key, pageSize) => {
+    setTablePagination((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        page: 0,
+        pageSize,
+      },
+    }));
+  };
+
+  const setTableTotal = (key, total) => {
+    setTablePagination((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        total: total || 0,
+      },
+    }));
+  };
+
+  const handleFilterChange = (field, value) => {
+    setFilters((prev) => {
+      const updated = { ...prev, [field]: value };
+
+      if (field === "ciudadId") {
+        updated.sucursalId = "";
+        updated.almacenId = "";
+      }
+
+      if (field === "sucursalId") {
+        updated.almacenId = "";
+      }
+
+      return updated;
+    });
+  };
+
+  const limpiarFiltros = () => {
+    setFilters({
+      search: "",
+      fechaDesde: "",
+      fechaHasta: "",
+      ciudadId: "",
+      sucursalId: "",
+      almacenId: "",
+      categoriaId: "",
+      modeloId: "",
+      proveedorId: "",
+      observado: "",
+    });
+  };
+
+  const sucursalesFiltradas = useMemo(() => {
+    if (!filters.ciudadId) return sucursales;
+
+    return sucursales.filter(
+      (s) => Number(s.idCiudad || s.ciudadId) === Number(filters.ciudadId)
+    );
+  }, [sucursales, filters.ciudadId]);
+
+  const almacenesFiltrados = useMemo(() => {
+    if (!filters.sucursalId) return almacenes;
+
+    return almacenes.filter(
+      (a) => Number(a.sucursalId) === Number(filters.sucursalId)
+    );
+  }, [almacenes, filters.sucursalId]);
+
+  const cargarReporte = async () => {
+    try {
+      setLoading(true);
+      setErrorMsg("");
+
+      const [
+        dashEntradasRes,
+        detalleRes,
+        diaRes,
+        sucursalRes,
+        productoRes,
+        importacionRes,
+        proveedorRes,
+        observadosRes,
+        dashStockRes,
+        stockRes,
+        stockDetalleRes,
+      ] = await Promise.allSettled([
+        ServiceReporteInventario.getDashboard(params),
+
+        ServiceReporteInventario.getDetalle({
+          ...params,
+          page: detallePage + 1,
+          pageSize: detallePageSize,
+        }),
+
+        ServiceReporteInventario.getPorDia({
+          ...params,
+          page: tablePagination.porDia.page + 1,
+          pageSize: tablePagination.porDia.pageSize,
+        }),
+
+        ServiceReporteInventario.getPorSucursalAlmacen({
+          ...params,
+          page: tablePagination.porSucursal.page + 1,
+          pageSize: tablePagination.porSucursal.pageSize,
+        }),
+
+        ServiceReporteInventario.getPorProducto({
+          ...params,
+          page: tablePagination.porProducto.page + 1,
+          pageSize: tablePagination.porProducto.pageSize,
+        }),
+
+        ServiceReporteInventario.getPorImportacion({
+          ...params,
+          page: tablePagination.porImportacion.page + 1,
+          pageSize: tablePagination.porImportacion.pageSize,
+        }),
+
+        ServiceReporteInventario.getPorProveedor({
+          ...params,
+          page: tablePagination.porProveedor.page + 1,
+          pageSize: tablePagination.porProveedor.pageSize,
+        }),
+
+        ServiceReporteInventario.getObservados({
+          ...params,
+          page: tablePagination.observados.page + 1,
+          pageSize: tablePagination.observados.pageSize,
+        }),
+
+        ServiceReporteInventario.getStockDashboard(params),
+
+        // ✅ NO enviar observado a getStockActual
+        ServiceReporteInventario.getStockActual({
+          search: params.search,
+          ciudadId: params.ciudadId,
+          sucursalId: params.sucursalId,
+          almacenId: params.almacenId,
+          categoriaId: params.categoriaId,
+          modeloId: params.modeloId,
+          page: tablePagination.stockActual.page + 1,
+          pageSize: tablePagination.stockActual.pageSize,
+        }),
+
+        ServiceReporteInventario.getStockDetalle({
+          ...params,
+          page: stockDetallePage + 1,
+          pageSize: stockDetallePageSize,
+        }),
+      ]);
+
+      // ✅ AGREGAR: Procesar dashboard de entradas
+      if (dashEntradasRes.status === "fulfilled") {
+        setDashboardEntradas(dashEntradasRes.value || {});
+      }
+
+      if (detalleRes.status === "fulfilled") {
+        const data = normalizeList(detalleRes.value);
+        setDetalle(data.items);
+        setDetalleTotal(data.total);
+      }
+
+      if (diaRes.status === "fulfilled") {
+        const data = normalizeList(diaRes.value);
+        setPorDia(data.items);
+        setTableTotal("porDia", data.total);
+      }
+
+      if (sucursalRes.status === "fulfilled") {
+        const data = normalizeList(sucursalRes.value);
+        setPorSucursal(data.items);
+        setTableTotal("porSucursal", data.total);
+      }
+
+      if (productoRes.status === "fulfilled") {
+        const data = normalizeList(productoRes.value);
+        setPorProducto(data.items);
+        setTableTotal("porProducto", data.total);
+      }
+
+      if (importacionRes.status === "fulfilled") {
+        const data = normalizeList(importacionRes.value);
+        setPorImportacion(data.items);
+        setTableTotal("porImportacion", data.total);
+      }
+
+      if (proveedorRes.status === "fulfilled") {
+        const data = normalizeList(proveedorRes.value);
+        setPorProveedor(data.items);
+        setTableTotal("porProveedor", data.total);
+      }
+
+      if (observadosRes.status === "fulfilled") {
+        const data = normalizeList(observadosRes.value);
+        setObservados(data.items);
+        setTableTotal("observados", data.total);
+      }
+
+      // ✅ AGREGAR: Procesar dashboard de stock
+      if (dashStockRes.status === "fulfilled") {
+        setDashboardStock(dashStockRes.value || {});
+      }
+
+      if (stockRes.status === "fulfilled") {
+        const data = normalizeList(stockRes.value);
+        setStockActual(data.items);
+        setTableTotal("stockActual", data.total);
+      }
+
+      if (stockDetalleRes.status === "fulfilled") {
+        const data = normalizeList(stockDetalleRes.value);
+        setStockDetalle(data.items);
+        setStockDetalleTotal(data.total);
+      }
+
+      const rejected = [
+        dashEntradasRes,
+        detalleRes,
+        diaRes,
+        sucursalRes,
+        productoRes,
+        importacionRes,
+        proveedorRes,
+        observadosRes,
+        dashStockRes,
+        stockRes,
+        stockDetalleRes,
+      ].find((r) => r.status === "rejected");
+
+      if (rejected) throw rejected.reason;
+    } catch (error) {
+      console.error(error);
+      setErrorMsg(error.message || "Error al cargar reporte de inventario");
+      toast.error(error.message || "Error al cargar reporte de inventario");
+    } finally {
+      setLoading(false);
+    }
+  };
+  const activeFilters = useMemo(() => getActiveFilters(), [mainTab, stockTab]);
+
+    const params = useMemo(() => {
+      const p = {};
+
+      if (filters.search?.trim()) p.search = filters.search.trim();
+      if (activeFilters.includes("fechaDesde") && filters.fechaDesde)
+        p.fechaDesde = filters.fechaDesde;
+      if (activeFilters.includes("fechaHasta") && filters.fechaHasta)
+        p.fechaHasta = filters.fechaHasta;
+      if (activeFilters.includes("ciudadId") && filters.ciudadId)
+        p.ciudadId = Number(filters.ciudadId);
+      if (activeFilters.includes("sucursalId") && filters.sucursalId)
+        p.sucursalId = Number(filters.sucursalId);
+      if (activeFilters.includes("almacenId") && filters.almacenId)
+        p.almacenId = Number(filters.almacenId);
+      if (activeFilters.includes("categoriaId") && filters.categoriaId)
+        p.categoriaId = Number(filters.categoriaId);
+      if (activeFilters.includes("modeloId") && filters.modeloId)
+        p.modeloId = Number(filters.modeloId);
+      if (activeFilters.includes("proveedorId") && filters.proveedorId)
+        p.proveedorId = Number(filters.proveedorId);
+      if (activeFilters.includes("observado") && filters.observado)
+        p.observado = Number(filters.observado);
+
+      return p;
+    }, [filters, activeFilters]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      cargarReporte();
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [
+    params,
+    mainTab,           // ✅ AGREGAR
+    stockTab,   
+    detallePage,
+    detallePageSize,
+    stockDetallePage,
+    stockDetallePageSize,
+    tablePagination.porDia.page,
+    tablePagination.porDia.pageSize,
+    tablePagination.porSucursal.page,
+    tablePagination.porSucursal.pageSize,
+    tablePagination.porProducto.page,
+    tablePagination.porProducto.pageSize,
+    tablePagination.porImportacion.page,
+    tablePagination.porImportacion.pageSize,
+    tablePagination.porProveedor.page,
+    tablePagination.porProveedor.pageSize,
+    tablePagination.observados.page,
+    tablePagination.observados.pageSize,
+    tablePagination.stockActual.page,
+    tablePagination.stockActual.pageSize,
+  ]);
+
+  useEffect(() => {
+    setDetallePage(0);
+    setStockDetallePage(0);
+
+    setTablePagination((prev) => ({
+      porDia: { ...prev.porDia, page: 0 },
+      porSucursal: { ...prev.porSucursal, page: 0 },
+      porProducto: { ...prev.porProducto, page: 0 },
+      porImportacion: { ...prev.porImportacion, page: 0 },
+      porProveedor: { ...prev.porProveedor, page: 0 },
+      observados: { ...prev.observados, page: 0 },
+      stockActual: { ...prev.stockActual, page: 0 },
+    }));
+  }, [params, mainTab, stockTab]);
+
+  useEffect(() => {
+    const cargarCombos = async () => {
+      try {
+        const [ciuRes, sucRes, almRes, catRes, modRes, provRes] =
+          await Promise.all([
+            ServiceCiudad.getAll({ page: 1, pageSize: 1000 }),
+            ServiceSucursal.getAll({ page: 1, pageSize: 1000 }),
+            ServiceAlmacen.getAll({ page: 1, pageSize: 1000 }),
+            ServiceCategoria.getAll({ page: 1, pageSize: 1000 }),
+            ServiceModelo.getAll({ page: 1, pageSize: 1000 }),
+            ServiceProveedor.getAll({ page: 1, pageSize: 1000 }),
+          ]);
+
+        setCiudades(Array.isArray(ciuRes) ? ciuRes : ciuRes.items || []);
+        setSucursales(Array.isArray(sucRes) ? sucRes : sucRes.items || []);
+        setAlmacenes(Array.isArray(almRes) ? almRes : almRes.items || []);
+        setCategorias(Array.isArray(catRes) ? catRes : catRes.items || []);
+        setModelos(Array.isArray(modRes) ? modRes : modRes.items || []);
+        setProveedores(Array.isArray(provRes) ? provRes : provRes.items || []);
+      } catch (error) {
+        console.error(error);
+        toast.error(error.message || "Error al cargar filtros");
+      }
+    };
+
+    cargarCombos();
+  }, []);
+
+  const renderEstadoStock = (estado) => {
+    const bajo = estado === "Stock Bajo";
+
+    return (
+      <Chip
+        label={estado || "—"}
+        size="small"
+        sx={{
+          fontWeight: 800,
+          bgcolor: bajo ? "#FEE2E2" : "#DCFCE7",
+          color: bajo ? "#991B1B" : "#166534",
+        }}
+      />
+    );
+  };
+
+  const renderObservado = (value) => {
+    const observado = Number(value) === 2;
+
+    return (
+      <Chip
+        label={observado ? "Observado" : "Normal"}
+        size="small"
+        sx={{
+          fontWeight: 800,
+          bgcolor: observado ? "#FEE2E2" : "#DCFCE7",
+          color: observado ? "#991B1B" : "#166534",
+        }}
+      />
+    );
+  };
+
+  const entradaCards = [
+    {
+      title: "Productos ingresados",
+      subtitle: "Histórico de entradas",
+      value: dashboardEntradas.productosIngresados || 0,
+      icon: Package,
+      color: "#2563EB",
+    },
+    {
+      title: "Costo origen",
+      subtitle: "Inversión de entradas",
+      value: money(dashboardEntradas.costoTotalOrigen),
+      icon: DollarSign,
+      color: "#0D8C47",
+    },
+    {
+      title: "Valor venta",
+      subtitle: "Proyección comercial",
+      value: money(dashboardEntradas.valorVentaEstimado),
+      icon: TrendingUp,
+      color: "#B45309",
+    },
+    {
+      title: "Importaciones",
+      subtitle: "Relacionadas a entradas",
+      value: dashboardEntradas.importacionesRelacionadas || 0,
+      icon: Boxes,
+      color: "#592B2B",
+    },
+    {
+      title: "Observados",
+      subtitle: "Productos con observación",
+      value: dashboardEntradas.productosObservados || 0,
+      icon: CircleAlert,
+      color: "#991B1B",
+    },
+  ];
+
+  const stockCards = [
+    {
+      title: "Stock actual",
+      subtitle: "Productos disponibles",
+      value: dashboardStock.stockTotal || 0,
+      icon: Boxes,
+      color: "#0F766E",
+    },
+    {
+      title: "Valor stock",
+      subtitle: "Valor venta disponible",
+      value: money(dashboardStock.valorVentaStock),
+      icon: TrendingUp,
+      color: "#B45309",
+    },
+    {
+      title: "Costo stock",
+      subtitle: "Costo origen disponible",
+      value: money(dashboardStock.costoTotalStock),
+      icon: DollarSign,
+      color: "#0D8C47",
+    },
+    {
+      title: "Modelos",
+      subtitle: "Modelos con stock",
+      value: dashboardStock.modelosConStock || 0,
+      icon: Package,
+      color: "#2563EB",
+    },
+    {
+      title: "Almacenes",
+      subtitle: "Almacenes con stock",
+      value: dashboardStock.almacenesConStock || 0,
+      icon: Warehouse,
+      color: "#475569",
+    },
+  ];
+
+  const cards = mainTab === 0 ? entradaCards : stockCards;
+
+const addHeaderPDF = (doc, titulo) => {
+  const width = doc.internal.pageSize.getWidth();
+
+  doc.setFillColor(...COLORS.dark);
+  doc.rect(0, 0, width, 30, "F");
+
+  doc.setFillColor(...COLORS.primary);
+  doc.rect(0, 30, width, 3, "F");
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.text("COMERCIAL POMA", 14, 16);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text("15 años en la industria de ventas de línea blanca", 14, 24);
+
+  doc.setTextColor(...COLORS.light);
+  doc.setFontSize(8);
+  doc.text(new Date().toLocaleString("es-BO"), width - 58, 18);
+
+  doc.setTextColor(...COLORS.dark);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.text(titulo, 14, 45);
+
+  const filtros = [
+    filters.search ? `Búsqueda: ${filters.search}` : null,
+    filters.fechaDesde ? `Desde: ${filters.fechaDesde}` : null,
+    filters.fechaHasta ? `Hasta: ${filters.fechaHasta}` : null,
+  ]
+    .filter(Boolean)
+    .join("   |   ");
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...COLORS.gray);
+  doc.text(filtros || "Sin filtros aplicados", 14, 52);
+};
+
+const addTablaPDF = (doc, titulo, head, body, startY) => {
+  doc.setFontSize(13);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.dark);
+  doc.text(titulo, 14, startY);
+
+  autoTable(doc, {
+    startY: startY + 6,
+    head: [head],
+    body,
+    theme: "striped",
+    styles: {
+      fontSize: 8.5,
+      cellPadding: 3,
+      overflow: "linebreak",
+      textColor: COLORS.dark,
+      lineColor: [230, 230, 230],
+    },
+    headStyles: {
+      fillColor: COLORS.primary,
+      textColor: 255,
+      fontStyle: "bold",
+      halign: "center",
+    },
+    alternateRowStyles: {
+      fillColor: [252, 249, 249],
+    },
+    margin: { left: 14, right: 14 },
+  });
+
+  return doc.lastAutoTable.finalY + 10;
+};
+
+const getAllReportesPDF = () => {
+  return [
+    {
+      id: "detalle",
+      grupo: "Entradas",
+      titulo: "Detalle histórico de entradas",
+      head: ["Fecha", "Serie", "Modelo", "Categoría", "Proveedor", "Sucursal", "Almacén"],
+      body: detalle.map((r) => [
+        r.fechaEntradaSolo || "—",
+        r.numeroSerie || "—",
+        r.nombreModelo || "—",
+        r.categoriaNombre || "—",
+        r.proveedorNombre || "—",
+        r.sucursalNombre || "—",
+        r.almacenNombre || "—",
+      ]),
+    },
+    {
+      id: "porDia",
+      grupo: "Entradas",
+      titulo: "Resumen diario de entradas",
+      head: ["Fecha", "Ingresados", "Observados", "Costo origen", "Valor venta"],
+      body: porDia.map((r) => [
+        r.fecha || "—",
+        r.productosIngresados || 0,
+        r.productosObservados || 0,
+        money(r.costoTotalOrigen),
+        money(r.valorVentaEstimado),
+      ]),
+    },
+    {
+      id: "porSucursal",
+      grupo: "Entradas",
+      titulo: "Entradas por sucursal y almacén",
+      head: ["Ciudad", "Sucursal", "Almacén", "Productos", "Observados", "Costo origen"],
+      body: porSucursal.map((r) => [
+        r.ciudadNombre || "—",
+        r.sucursalNombre || "—",
+        r.almacenNombre || "—",
+        r.productosIngresados || 0,
+        r.productosObservados || 0,
+        money(r.costoTotalOrigen),
+      ]),
+    },
+    {
+      id: "porProducto",
+      grupo: "Entradas",
+      titulo: "Entradas por producto",
+      head: ["Categoría", "Modelo", "Capacidad", "Ingresados", "Observados", "Valor venta"],
+      body: porProducto.map((r) => [
+        r.categoriaNombre || "—",
+        r.nombreModelo || "—",
+        r.capacidadTexto || "—",
+        r.productosIngresados || 0,
+        r.productosObservados || 0,
+        money(r.valorVentaEstimado),
+      ]),
+    },
+    {
+      id: "porImportacion",
+      grupo: "Entradas",
+      titulo: "Entradas por importación",
+      head: ["Importación", "Proveedor", "Fecha llegada", "Productos", "Observados"],
+      body: porImportacion.map((r) => [
+        r.importacionCodigo || "—",
+        r.proveedorNombre || "—",
+        r.fechaLlegada || "—",
+        r.productosIngresados || 0,
+        r.productosObservados || 0,
+      ]),
+    },
+    {
+      id: "porProveedor",
+      grupo: "Entradas",
+      titulo: "Entradas por proveedor",
+      head: ["Proveedor", "Encargado", "Productos", "Observados", "Costo origen"],
+      body: porProveedor.map((r) => [
+        r.proveedorNombre || "—",
+        r.proveedorEncargado || "—",
+        r.productosIngresados || 0,
+        r.productosObservados || 0,
+        money(r.costoTotalOrigen),
+      ]),
+    },
+    {
+      id: "observados",
+      grupo: "Entradas",
+      titulo: "Productos observados",
+      head: ["Serie", "Modelo", "Categoría", "Sucursal", "Almacén", "Observación"],
+      body: observados.map((r) => [
+        r.numeroSerie || "—",
+        r.nombreModelo || "—",
+        r.categoriaNombre || "—",
+        r.sucursalNombre || "—",
+        r.almacenNombre || "—",
+        r.obsDescripcion || "—",
+      ]),
+    },
+    {
+      id: "stockActual",
+      grupo: "Stock",
+      titulo: "Stock actual agrupado",
+      head: ["Ciudad", "Sucursal", "Almacén", "Sección", "Modelo", "Cantidad", "Estado"],
+      body: stockActual.map((r) => [
+        r.ciudad || "—",
+        r.sucursal || "—",
+        r.almacen || "—",
+        r.seccion || "—",
+        r.nombreModelo || "—",
+        r.cantidad || 0,
+        r.estadoStock || "—",
+      ]),
+    },
+    {
+      id: "stockDetalle",
+      grupo: "Stock",
+      titulo: "Productos disponibles en stock",
+      head: ["Serie", "Modelo", "Sucursal", "Almacén", "Sección", "Precio venta"],
+      body: stockDetalle.map((r) => [
+        r.numeroSerie || "—",
+        r.nombreModelo || "—",
+        r.sucursal || "—",
+        r.almacen || "—",
+        r.seccion || "—",
+        money(r.precioVenta),
+      ]),
+    },
+  ];
+};
+
+const getReporteActualPDF = () => {
+  if (mainTab === 0) {
+    return getAllReportesPDF()[entradaTab];
+  }
+
+  return stockTab === 0
+    ? getAllReportesPDF().find((r) => r.id === "stockActual")
+    : getAllReportesPDF().find((r) => r.id === "stockDetalle");
+};
+
+const exportarReportesPDF = (reportes) => {
+  const reportesConDatos = reportes.filter((r) => r.body?.length);
+
+  if (!reportesConDatos.length) {
+    toast.warning("No hay datos para exportar.");
+    return;
+  }
+
+  const doc = new jsPDF("landscape");
+
+  reportesConDatos.forEach((reporte, index) => {
+    if (index > 0) doc.addPage();
+
+    addHeaderPDF(doc, reporte.titulo);
+    addTablaPDF(doc, reporte.titulo, reporte.head, reporte.body, 60);
+  });
+
+  doc.save(`comercial_poma_reporte_${new Date().toISOString().slice(0, 10)}.pdf`);
+};
+
+const exportarVistaActualPDF = () => {
+  exportarReportesPDF([getReporteActualPDF()]);
+  setExportAnchorEl(null);
+};
+
+const exportarSeleccionadosPDF = () => {
+  const reportes = getAllReportesPDF().filter((r) => selectedExports.includes(r.id));
+
+  if (!selectedExports.length) {
+    toast.warning("Selecciona al menos un reporte.");
+    return;
+  }
+
+  exportarReportesPDF(reportes);
+  setOpenExportDialog(false);
+  setExportAnchorEl(null);
+};
+  return (
+    <Box sx={{ p: { xs: 2, md: 4 } }}>
+      <Box
+        sx={{
+          mb: 3,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: { xs: "flex-start", md: "center" },
+          flexDirection: { xs: "column", md: "row" },
+          gap: 2,
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: "50%",
+              bgcolor: "#592B2B20",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <BarChart3 size={25} color="#592B2B" />
+          </Box>
+
+          <Box>
+            <Typography variant="h4" sx={{ fontWeight: 900, color: BRAND.dark }}>
+               Reporte de Inventario - COMERCIAL POMA
+            </Typography>
+            
+            <Typography variant="body2" sx={{ color: BRAND.gray }}>
+               15 años en la industria de ventas de línea blanca.
+            </Typography>                        
+          </Box>
+        </Box>
+        <Button
+          variant="outlined"
+          startIcon={<RefreshCcw size={16} />}
+          onClick={cargarReporte}
+          disabled={loading}
+            sx={{
+              borderRadius: 2,
+              borderColor: "#592B2B",
+              color: "#592B2B",
+              textTransform: "none",
+              fontWeight: 700,
+              bgcolor: "white",
+            }}                    
+        >
+          Actualizar
+        </Button>
+
+        <Button
+          variant="contained"
+          startIcon={<Download size={17} />}
+          onClick={(e) => setExportAnchorEl(e.currentTarget)}
+          disabled={loading}
+          sx={{
+              borderRadius: 2,
+              bgcolor: BRAND.red,
+              textTransform: "none",
+              fontWeight: 800,
+              px: 2.5,
+              boxShadow: "0 8px 18px rgba(164,25,61,0.25)",
+              "&:hover": { bgcolor: "#861331" },
+            }}
+        >
+          Exportar PDF
+        </Button>
+
+        <Menu
+          anchorEl={exportAnchorEl}
+          open={openExportMenu}
+          onClose={() => setExportAnchorEl(null)}
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              mt: 1,
+              minWidth: 260,
+              boxShadow: "0 12px 30px rgba(0,0,0,0.12)",
+            },
+          }}
+        >
+          <MenuItem onClick={exportarVistaActualPDF}>
+            <ListItemIcon>
+              <FileText size={18} />
+            </ListItemIcon>
+            <ListItemText primary="Exportar vista actual" />
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              setSelectedExports([getReporteActualPDF()?.id].filter(Boolean));
+              setOpenExportDialog(true);
+            }}
+          >
+            <ListItemIcon>
+              <Download size={18} />
+            </ListItemIcon>
+            <ListItemText primary="Elegir reportes a exportar" />
+          </MenuItem>
+        </Menu>
+
+      </Box>
+
+      <Card
+        variant="outlined"
+        sx={{
+          p: 2,
+          mb: 3,
+          borderRadius: 3,
+          borderColor: "#f1d2d2",
+          bgcolor: "#fdf5f5",
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+          <Filter size={18} color="#592B2B" />
+          <Typography sx={{ fontWeight: 700, color: "#3A1A1A" }}>
+            Filtros del reporte
+          </Typography>
+        </Box>
+
+        <Grid container spacing={2} alignItems="center">
+          {/* Búsqueda - Siempre visible */}
+          <Grid item xs={12} md={5}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Buscar serie, modelo, proveedor, importación..."
+              value={filters.search}
+              onChange={(e) => handleFilterChange("search", e.target.value)}
+              sx={{
+                ...fieldStyle,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 3,
+                  bgcolor: "white",
+                  height: 46,
+                },
+              }}
+            />
+          </Grid>
+
+          {/* Fechas - Solo si están activos */}
+          {activeFilters.includes("fechaDesde") && (
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                fullWidth
+                size="small"
+                type="date"
+                label="Desde"
+                value={filters.fechaDesde}
+                onChange={(e) => handleFilterChange("fechaDesde", e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                sx={fieldStyle}
+              />
+            </Grid>
+          )}
+
+          {activeFilters.includes("fechaHasta") && (
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                fullWidth
+                size="small"
+                type="date"
+                label="Hasta"
+                value={filters.fechaHasta}
+                onChange={(e) => handleFilterChange("fechaHasta", e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                sx={fieldStyle}
+              />
+            </Grid>
+          )}
+
+          {/* Ciudad - Siempre */}
+          {activeFilters.includes("ciudadId") && (
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="Ciudad"
+                value={filters.ciudadId}
+                onChange={(e) => handleFilterChange("ciudadId", e.target.value)}
+                sx={fieldStyle}
+              >
+                <MenuItem value="">Todas</MenuItem>
+                {ciudades.map((item) => (
+                  <MenuItem key={item.id} value={item.id}>
+                    {item.nombre || item.Nombre}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+          )}
+
+          {/* Sucursal - Siempre */}
+          {activeFilters.includes("sucursalId") && (
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="Sucursal"
+                value={filters.sucursalId}
+                onChange={(e) => handleFilterChange("sucursalId", e.target.value)}
+                sx={fieldStyle}
+              >
+                <MenuItem value="">Todas</MenuItem>
+                {sucursalesFiltradas.map((item) => (
+                  <MenuItem key={item.id} value={item.id}>
+                    {item.nombre}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+          )}
+
+          {/* Almacén - Siempre */}
+          {activeFilters.includes("almacenId") && (
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="Almacén"
+                value={filters.almacenId}
+                onChange={(e) => handleFilterChange("almacenId", e.target.value)}
+                sx={fieldStyle}
+              >
+                <MenuItem value="">Todos</MenuItem>
+                {almacenesFiltrados.map((item) => (
+                  <MenuItem key={item.id} value={item.id}>
+                    {item.nombre}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+          )}
+
+          {/* Categoría - Siempre */}
+          {activeFilters.includes("categoriaId") && (
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="Categoría"
+                value={filters.categoriaId}
+                onChange={(e) => handleFilterChange("categoriaId", e.target.value)}
+                sx={fieldStyle}
+              >
+                <MenuItem value="">Todas</MenuItem>
+                {categorias.map((item) => (
+                  <MenuItem key={item.id} value={item.id}>
+                    {item.nombre}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+          )}
+
+          {/* Modelo - Siempre */}
+          {activeFilters.includes("modeloId") && (
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="Modelo"
+                value={filters.modeloId}
+                onChange={(e) => handleFilterChange("modeloId", e.target.value)}
+                sx={fieldStyle}
+              >
+                <MenuItem value="">Todos</MenuItem>
+                {modelos.map((item) => (
+                  <MenuItem key={item.id} value={item.id}>
+                    {item.nombreModelo || item.nombre}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+          )}
+
+          {/* Proveedor - Solo si activo */}
+          {activeFilters.includes("proveedorId") && (
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="Proveedor"
+                value={filters.proveedorId}
+                onChange={(e) => handleFilterChange("proveedorId", e.target.value)}
+                sx={fieldStyle}
+              >
+                <MenuItem value="">Todos</MenuItem>
+                {proveedores.map((item) => (
+                  <MenuItem key={item.id} value={item.id}>
+                    {item.razonSocial || item.nombre}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+          )}
+
+          {/* Observado - Solo si activo */}
+          {activeFilters.includes("observado") && (
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="Estado producto"
+                value={filters.observado}
+                onChange={(e) => handleFilterChange("observado", e.target.value)}
+                sx={fieldStyle}
+              >
+                <MenuItem value="">Todos</MenuItem>
+                <MenuItem value="1">Normal</MenuItem>
+                <MenuItem value="2">Observado</MenuItem>
+              </TextField>
+            </Grid>
+          )}
+
+          {/* Botón Limpiar */}
+          <Grid item xs={12} sm={6} md={2}>
+            <Button
+              fullWidth
+              variant="outlined"
+              startIcon={<RefreshCcw size={16} />}
+              onClick={limpiarFiltros}
+              sx={{
+                height: 40,
+                borderRadius: 2,
+                borderColor: "#592B2B",
+                color: "#592B2B",
+                bgcolor: "white",
+                textTransform: "none",
+                fontWeight: 700,
+                whiteSpace: "nowrap",
+              }}
+            >
+              Limpiar
+            </Button>
+          </Grid>
+        </Grid>
+      </Card>
+
+      {errorMsg && (
+        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+          {errorMsg}
+        </Alert>
+      )}
+
+      <Tabs
+        value={mainTab}
+        onChange={(_, value) => setMainTab(value)}
+        sx={{
+          mb: 2,
+          "& .MuiTab-root": {
+            textTransform: "none",
+            fontWeight: 800,
+            fontSize: 15,
+          },
+          "& .Mui-selected": {
+            color: "#592B2B !important",
+          },
+          "& .MuiTabs-indicator": {
+            bgcolor: "#592B2B",
+            height: 3,
+            borderRadius: 2,
+          },
+        }}
+      >
+        <Tab label="Reporte de Entradas" />
+        <Tab label="Stock Actual" />
+      </Tabs>
+
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        {cards.map((item) => {
+          const Icon = item.icon;
+
+          return (
+            <Grid item xs={12} sm={6} md={3} lg={2.4} key={item.title}>
+              <Card
+                variant="outlined"
+                sx={{
+                  p: 2.2,
+                  borderRadius: 4,
+                  borderColor: "#eee",
+                  height: "100%",
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.04)",
+                }}
+              >
+                <Box sx={{ display: "flex", gap: 1.5 }}>
+                  <Box
+                    sx={{
+                      width: 46,
+                      height: 46,
+                      borderRadius: "16px",
+                      bgcolor: `${item.color}18`,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Icon size={23} color={item.color} />
+                  </Box>
+
+                  <Box>
+                    <Typography sx={{ fontWeight: 800, color: "#2B1111" }}>
+                      {item.title}
+                    </Typography>
+
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: "block", mb: 0.5 }}
+                    >
+                      {item.subtitle}
+                    </Typography>
+
+                    <Typography variant="h5" sx={{ fontWeight: 900, color: item.color }}>
+                      {item.value}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Card>
+            </Grid>
+          );
+        })}
+      </Grid>
+
+      <Card
+        variant="outlined"
+        sx={{
+          borderRadius: 3,
+          borderColor: "#f1d2d2",
+          overflow: "hidden",
+        }}
+      >
+        {mainTab === 0 && (
+          <>
+            <Box sx={{ px: 2, pt: 2 }}>
+              <Typography sx={{ fontWeight: 900, color: "#2B1111" }}>
+                Entradas históricas
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Muestra todo lo que ingresó al sistema mediante movimientos de entrada.
+              </Typography>
+            </Box>
+
+            <Tabs
+              value={entradaTab}
+              onChange={(_, value) => setEntradaTab(value)}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={tabStyle}
+            >
+              {entradaTabs.map((item) => (
+                <Tab key={item} label={item} />
+              ))}
+            </Tabs>
+
+            {entradaTab === 0 && (
+              <SimpleTable
+                loading={loading}
+                rows={detalle}
+                total={detalleTotal}
+                page={detallePage}
+                rowsPerPage={detallePageSize}
+                onPageChange={setDetallePage}
+                onRowsPerPageChange={setDetallePageSize}
+                empty="No se encontraron entradas de inventario."
+                columns={[
+                  ["fechaEntradaSolo", "Fecha"],
+                  ["numeroSerie", "Serie"],
+                  ["nombreModelo", "Modelo"],
+                  ["categoriaNombre", "Categoría"],
+                  ["proveedorNombre", "Proveedor"],
+                  ["sucursalNombre", "Sucursal"],
+                  ["almacenNombre", "Almacén"],
+                  ["observado", "Estado", renderObservado],
+                ]}
+              />
+            )}
+
+            {entradaTab === 1 && (
+              <SimpleTable
+                loading={loading}
+                rows={porDia}
+                total={tablePagination.porDia.total}
+                page={tablePagination.porDia.page}
+                rowsPerPage={tablePagination.porDia.pageSize}
+                onPageChange={(page) => handleTablePageChange("porDia", page)}
+                onRowsPerPageChange={(size) => handleTablePageSizeChange("porDia", size)}
+                empty="No hay datos por día."
+                columns={[
+                  ["fecha", "Fecha"],
+                  ["productosIngresados", "Ingresados"],
+                  ["productosObservados", "Observados"],
+                  ["costoTotalOrigen", "Costo origen", money],
+                  ["valorVentaEstimado", "Valor venta", money],
+                ]}
+              />
+            )}
+
+            {entradaTab === 2 && (
+              <SimpleTable
+                loading={loading}
+                rows={porSucursal}
+                total={tablePagination.porSucursal.total}
+                page={tablePagination.porSucursal.page}
+                rowsPerPage={tablePagination.porSucursal.pageSize}
+                onPageChange={(page) => handleTablePageChange("porSucursal", page)}
+                onRowsPerPageChange={(size) => handleTablePageSizeChange("porSucursal", size)}
+                empty="No hay datos por sucursal y almacén."
+                columns={[
+                  ["ciudadNombre", "Ciudad"],
+                  ["sucursalNombre", "Sucursal"],
+                  ["almacenNombre", "Almacén"],
+                  ["productosIngresados", "Productos"],
+                  ["productosObservados", "Observados"],
+                  ["costoTotalOrigen", "Costo origen", money],
+                ]}
+              />
+            )}
+
+            {entradaTab === 3 && (
+              <SimpleTable
+                loading={loading}
+                rows={porProducto}
+                total={tablePagination.porProducto.total}
+                page={tablePagination.porProducto.page}
+                rowsPerPage={tablePagination.porProducto.pageSize}
+                onPageChange={(page) => handleTablePageChange("porProducto", page)}
+                onRowsPerPageChange={(size) => handleTablePageSizeChange("porProducto", size)}
+                empty="No hay datos por producto."
+                columns={[
+                  ["categoriaNombre", "Categoría"],
+                  ["nombreModelo", "Modelo"],
+                  ["capacidadTexto", "Capacidad"],
+                  ["productosIngresados", "Ingresados"],
+                  ["productosObservados", "Observados"],
+                  ["valorVentaEstimado", "Valor venta", money],
+                ]}
+              />
+            )}
+
+            {entradaTab === 4 && (
+              <SimpleTable
+                loading={loading}
+                rows={porImportacion}
+                total={tablePagination.porImportacion.total}
+                page={tablePagination.porImportacion.page}
+                rowsPerPage={tablePagination.porImportacion.pageSize}
+                onPageChange={(page) => handleTablePageChange("porImportacion", page)}
+                onRowsPerPageChange={(size) => handleTablePageSizeChange("porImportacion", size)}
+                empty="No hay datos por importación."
+                columns={[
+                  ["importacionCodigo", "Importación"],
+                  ["proveedorNombre", "Proveedor"],
+                  ["fechaLlegada", "Fecha llegada"],
+                  ["productosIngresados", "Productos"],
+                  ["productosObservados", "Observados"],
+                ]}
+              />
+            )}
+
+            {entradaTab === 5 && (
+              <SimpleTable
+                loading={loading}
+                rows={porProveedor}
+                total={tablePagination.porProveedor.total}
+                page={tablePagination.porProveedor.page}
+                rowsPerPage={tablePagination.porProveedor.pageSize}
+                onPageChange={(page) => handleTablePageChange("porProveedor", page)}
+                onRowsPerPageChange={(size) => handleTablePageSizeChange("porProveedor", size)}
+                empty="No hay datos por proveedor."
+                columns={[
+                  ["proveedorNombre", "Proveedor"],
+                  ["proveedorEncargado", "Encargado"],
+                  ["productosIngresados", "Productos"],
+                  ["productosObservados", "Observados"],
+                  ["costoTotalOrigen", "Costo origen", money],
+                ]}
+              />
+            )}
+
+            {entradaTab === 6 && (
+              <SimpleTable
+                loading={loading}
+                rows={observados}
+                total={tablePagination.observados.total}
+                page={tablePagination.observados.page}
+                rowsPerPage={tablePagination.observados.pageSize}
+                onPageChange={(page) => handleTablePageChange("observados", page)}
+                onRowsPerPageChange={(size) => handleTablePageSizeChange("observados", size)}
+                empty="No hay productos observados."
+                columns={[
+                  ["numeroSerie", "Serie"],
+                  ["nombreModelo", "Modelo"],
+                  ["categoriaNombre", "Categoría"],
+                  ["sucursalNombre", "Sucursal"],
+                  ["almacenNombre", "Almacén"],
+                  ["obsDescripcion", "Observación"],
+                ]}
+              />
+            )}
+          </>
+        )}
+
+        {mainTab === 1 && (
+          <>
+            <Box sx={{ px: 2, pt: 2 }}>
+              <Typography sx={{ fontWeight: 900, color: "#2B1111" }}>
+                Stock actual
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Muestra únicamente productos disponibles según su último movimiento activo.
+              </Typography>
+            </Box>
+
+            <Tabs
+              value={stockTab}
+              onChange={(_, value) => setStockTab(value)}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={tabStyle}
+            >
+              {stockTabs.map((item) => (
+                <Tab key={item} label={item} />
+              ))}
+            </Tabs>
+
+            {stockTab === 0 && (
+              <SimpleTable
+                loading={loading}
+                rows={stockActual}
+                total={tablePagination.stockActual.total}
+                page={tablePagination.stockActual.page}
+                rowsPerPage={tablePagination.stockActual.pageSize}
+                onPageChange={(page) => handleTablePageChange("stockActual", page)}
+                onRowsPerPageChange={(size) => handleTablePageSizeChange("stockActual", size)}
+                empty="No hay stock actual."
+                columns={[
+                  ["ciudad", "Ciudad"],
+                  ["sucursal", "Sucursal"],
+                  ["almacen", "Almacén"],
+                  ["seccion", "Sección"],
+                  ["categoriaNombre", "Categoría"],
+                  ["nombreModelo", "Modelo"],
+                  ["cantidad", "Cantidad"],
+                  ["stockMinimo", "Stock mínimo"],
+                  ["valorVentaStock", "Valor stock", money],
+                  ["estadoStock", "Estado", renderEstadoStock],
+                ]}
+              />
+            )}
+
+            {stockTab === 1 && (
+              <SimpleTable
+                loading={loading}
+                rows={stockDetalle}
+                total={stockDetalleTotal}
+                page={stockDetallePage}
+                rowsPerPage={stockDetallePageSize}
+                onPageChange={setStockDetallePage}
+                onRowsPerPageChange={setStockDetallePageSize}
+                empty="No hay productos disponibles."
+                columns={[
+                  ["fechaUltimoMovimiento", "Último movimiento"],
+                  ["numeroSerie", "Serie"],
+                  ["nombreModelo", "Modelo"],
+                  ["categoriaNombre", "Categoría"],
+                  ["sucursal", "Sucursal"],
+                  ["almacen", "Almacén"],
+                  ["seccion", "Sección"],
+                  ["precioVenta", "Precio venta", money],
+                  ["observado", "Estado", renderObservado],
+                ]}
+              />
+            )}
+          </>
+        )}
+      </Card>
+      <Dialog
+        open={openExportDialog}
+        onClose={() => setOpenExportDialog(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 4,
+            overflow: "hidden",
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            bgcolor: BRAND.dark,
+            color: "white",
+            fontWeight: 900,
+          }}
+        >
+          Exportar reportes
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 3, bgcolor: "#fafafa" }}>
+          <Typography sx={{ fontWeight: 800, color: BRAND.dark, mb: 0.5 }}>
+            COMERCIAL POMA
+          </Typography>
+
+          <Typography variant="body2" sx={{ color: BRAND.gray, mb: 2 }}>
+            Selecciona una o varias pestañas para exportarlas en un solo PDF.
+          </Typography>
+
+          <Divider sx={{ mb: 2 }} />
+
+          {getAllReportesPDF().map((item) => (
+            <FormControlLabel
+              key={item.id}
+              sx={{
+                display: "flex",
+                mb: 1,
+                px: 1.5,
+                py: 0.7,
+                borderRadius: 2,
+                bgcolor: selectedExports.includes(item.id) ? "#a4193d12" : "white",
+                border: selectedExports.includes(item.id)
+                  ? `1px solid ${BRAND.red}`
+                  : "1px solid #eee",
+              }}
+              control={
+                <Checkbox
+                  checked={selectedExports.includes(item.id)}
+                  onChange={(e) => {
+                    setSelectedExports((prev) =>
+                      e.target.checked
+                        ? [...prev, item.id]
+                        : prev.filter((id) => id !== item.id)
+                    );
+                  }}
+                  sx={{
+                    color: BRAND.red,
+                    "&.Mui-checked": {
+                      color: BRAND.red,
+                    },
+                  }}
+                />
+              }
+              label={
+                <Box>
+                  <Typography sx={{ fontWeight: 800, color: BRAND.dark }}>
+                    {item.titulo}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: BRAND.gray }}>
+                    {item.grupo}
+                  </Typography>
+                </Box>
+              }
+            />
+          ))}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, py: 2, bgcolor: BRAND.light }}>
+          <Button
+            onClick={() => setOpenExportDialog(false)}
+            sx={{
+              color: BRAND.dark,
+              textTransform: "none",
+              fontWeight: 700,
+            }}
+          >
+            Cancelar
+          </Button>
+
+          <Button
+            variant="contained"
+            onClick={exportarSeleccionadosPDF}
+            sx={{
+              bgcolor: BRAND.red,
+              borderRadius: 2,
+              textTransform: "none",
+              fontWeight: 800,
+              "&:hover": {
+                bgcolor: "#861331",
+              },
+            }}
+          >
+            Exportar seleccionados
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}

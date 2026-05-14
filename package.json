@@ -17,7 +17,7 @@
     "axios": "^1.12.2",
     "framer-motion": "^12.38.0",
     "jspdf": "^3.0.4",
-    "jspdf-autotable": "^5.0.2",
+    "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.548.0",
     "react": "^19.1.1",
     "react-data-table-component": "^7.7.0",

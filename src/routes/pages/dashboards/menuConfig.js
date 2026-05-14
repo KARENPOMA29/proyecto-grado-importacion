@@ -28,8 +28,7 @@ export const adminMenu = [
   { label: "Secciones", icon: AssessmentIcon, to: "/admin/secciones", group: "Gestión" },
 
   // SISTEMA
-  { label: "Reporte de Importaciones", icon: AssessmentIcon, to: "/admin/reportes", group: "Sistema" },
-
+  { label: "Reporte de Importaciones", icon: AssessmentIcon, to: "/admin/reportes/Importacion", group: "Sistema" },
   { label: "Reporte de Ventas", icon: AssessmentIcon, to: "/admin/reportes/ventas", group: "Sistema" },
   { label: "Reporte de Inventario", icon: AssessmentIcon, to: "/admin/reportes/inventario", group: "Sistema" },
 

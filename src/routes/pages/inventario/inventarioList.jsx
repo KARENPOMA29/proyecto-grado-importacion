@@ -1,4 +1,3 @@
-// src/pages/movimientos/MovimientoList.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Eye,
@@ -60,6 +59,7 @@ const MovimientoList = () => {
   const [selectedSucursal, setSelectedSucursal] = useState(null);
   const [selectedAlmacen, setSelectedAlmacen] = useState(null);
 
+  const [loadingCiudades, setLoadingCiudades] = useState(true);
   const [loadingSucursales, setLoadingSucursales] = useState(false);
   const [loadingAlmacenes, setLoadingAlmacenes] = useState(false);
 
@@ -96,29 +96,36 @@ const MovimientoList = () => {
   const canCreate = isAdmin || isAlmacen;
   const canDelete = isAdmin;
 
+  // Cargar ciudades al iniciar
   useEffect(() => {
     const cargarCiudades = async () => {
       try {
+        setLoadingCiudades(true);
         const res = await ServiceCiudad.getAll?.();
         setCiudades(Array.isArray(res) ? res : res?.items ?? []);
+        setStep(0);
       } catch (error) {
         console.error(error);
         toast.error("Error al cargar ciudades");
+        setCiudades([]);
+      } finally {
+        setLoadingCiudades(false);
       }
     };
 
     cargarCiudades();
   }, []);
 
+  // Cargar datos del almacén para usuarios almaceneros
   useEffect(() => {
     if (!isAlmacen || !empleadoSucursalId) return;
 
     const cargarDatosAlmacen = async () => {
       try {
+        setLoadingAlmacenes(true);
         const sucursal = await ServiceSucursal.getById(empleadoSucursalId);
         setSelectedSucursal(sucursal);
-
-        setLoadingAlmacenes(true);
+        setSelectedCiudad(sucursal.ciudad || null);
 
         const res = await ServiceAlmacen.getAll({
           sucursalId: sucursal.id,
@@ -138,14 +145,12 @@ const MovimientoList = () => {
   }, [isAlmacen, empleadoSucursalId]);
 
   const handleSelectCiudad = async (ciudad) => {
-    // Limpiar estados anteriores de forma segura
-    setSelectedCiudad(ciudad);
-    setSelectedSucursal(null);
-    setSelectedAlmacen(null);
-    setSucursales([]);
-    setAlmacenes([]);
-
     try {
+      setSelectedCiudad(ciudad);
+      setSelectedSucursal(null);
+      setSelectedAlmacen(null);
+      setSucursales([]);
+      setAlmacenes([]);
       setLoadingSucursales(true);
 
       const res = await ServiceSucursal.getAll({
@@ -157,19 +162,18 @@ const MovimientoList = () => {
     } catch (error) {
       console.error(error);
       toast.error("Error al cargar sucursales");
-      setSucursales([]); // Asegurar que quede un array vacío en caso de error
+      setSucursales([]);
+      setStep(0); // Volver al paso anterior en caso de error
     } finally {
       setLoadingSucursales(false);
     }
   };
 
   const handleSelectSucursal = async (sucursal) => {
-    // Limpiar estados anteriores de forma segura
-    setSelectedSucursal(sucursal);
-    setSelectedAlmacen(null);
-    setAlmacenes([]);
-
     try {
+      setSelectedSucursal(sucursal);
+      setSelectedAlmacen(null);
+      setAlmacenes([]);
       setLoadingAlmacenes(true);
 
       const res = await ServiceAlmacen.getAll({
@@ -181,7 +185,8 @@ const MovimientoList = () => {
     } catch (error) {
       console.error(error);
       toast.error("Error al cargar almacenes");
-      setAlmacenes([]); // Asegurar que quede un array vacío en caso de error
+      setAlmacenes([]);
+      setStep(1); // Volver al paso anterior en caso de error
     } finally {
       setLoadingAlmacenes(false);
     }
@@ -195,7 +200,6 @@ const MovimientoList = () => {
   const handleGoBack = () => {
     if (isAdmin) {
       if (step === 1) {
-        // Regresar de sucursales a ciudades
         setStep(0);
         setSelectedCiudad(null);
         setSelectedSucursal(null);
@@ -206,7 +210,6 @@ const MovimientoList = () => {
       }
 
       if (step === 2) {
-        // Regresar de almacenes a sucursales
         setStep(1);
         setSelectedSucursal(null);
         setSelectedAlmacen(null);
@@ -215,7 +218,6 @@ const MovimientoList = () => {
       }
 
       if (step === 3) {
-        // Regresar de movimientos a almacenes
         setStep(2);
         setSelectedAlmacen(null);
         return;
@@ -230,7 +232,7 @@ const MovimientoList = () => {
 
   const getTotalSecciones = (almacen) => {
     if (!almacen) return 0;
-    
+
     if (almacen?.totalSecciones !== undefined) return almacen.totalSecciones;
 
     if (Array.isArray(almacen?.secciones)) {
@@ -253,7 +255,7 @@ const MovimientoList = () => {
 
   const getTextoProducto = (row) => {
     if (!row) return "—";
-    
+
     return (
       row.productoSerie ||
       row.producto?.numeroSerie ||
@@ -441,91 +443,95 @@ const MovimientoList = () => {
         Selecciona la ciudad donde deseas ver los almacenes y movimientos.
       </Typography>
 
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-        {ciudades.map((ciudad) => {
-          const seleccionada = selectedCiudad?.id === ciudad.id;
+      {loadingCiudades ? (
+        <LoadingState text="Cargando ciudades..." />
+      ) : (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          {ciudades.map((ciudad) => {
+            const seleccionada = selectedCiudad?.id === ciudad.id;
 
-          return (
-            <Card
-              key={ciudad.id}
-              variant="outlined"
-              onClick={() => handleSelectCiudad(ciudad)}
-              sx={{
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-                "&:hover": {
-                  borderColor: "#592B2B",
-                  backgroundColor: "#592B2B08",
-                  transform: "translateY(-2px)",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                },
-              }}
-            >
-              <Box sx={{ p: 2 }}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 2,
-                  }}
-                >
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <Box
-                      sx={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: "50%",
-                        bgcolor: seleccionada ? "#592B2B" : "#592B2B20",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Building
-                        size={20}
-                        color={seleccionada ? "white" : "#592B2B"}
-                      />
-                    </Box>
-
-                    <Box>
-                      <Typography fontSize={16} fontWeight={700} color="#3A1A1A">
-                        {ciudad.nombre || `Ciudad #${ciudad.id}`}
-                      </Typography>
-
-                      {ciudad.departamento && (
-                        <Typography
-                          fontSize={12}
-                          color="text.secondary"
-                          sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
-                        >
-                          <MapPin size={12} />
-                          {ciudad.departamento}
-                        </Typography>
-                      )}
-                    </Box>
-                  </Box>
-
-                  <Chip
-                    size="small"
-                    label={`${ciudad.totalSucursales ?? 0} sucursales`}
+            return (
+              <Card
+                key={ciudad.id}
+                variant="outlined"
+                onClick={() => handleSelectCiudad(ciudad)}
+                sx={{
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  "&:hover": {
+                    borderColor: "#592B2B",
+                    backgroundColor: "#592B2B08",
+                    transform: "translateY(-2px)",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                  },
+                }}
+              >
+                <Box sx={{ p: 2 }}>
+                  <Box
                     sx={{
-                      bgcolor: "#592B2B10",
-                      color: "#592B2B",
-                      fontWeight: 700,
-                      borderRadius: "10px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 2,
                     }}
-                  />
-                </Box>
-              </Box>
-            </Card>
-          );
-        })}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                      <Box
+                        sx={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: "50%",
+                          bgcolor: seleccionada ? "#592B2B" : "#592B2B20",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Building
+                          size={20}
+                          color={seleccionada ? "white" : "#592B2B"}
+                        />
+                      </Box>
 
-        {ciudades.length === 0 && (
-          <EmptyState icon={<Building size={32} />} text="No hay ciudades registradas" />
-        )}
-      </Box>
+                      <Box>
+                        <Typography fontSize={16} fontWeight={700} color="#3A1A1A">
+                          {ciudad.nombre || `Ciudad #${ciudad.id}`}
+                        </Typography>
+
+                        {ciudad.departamento && (
+                          <Typography
+                            fontSize={12}
+                            color="text.secondary"
+                            sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                          >
+                            <MapPin size={12} />
+                            {ciudad.departamento}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+
+                    <Chip
+                      size="small"
+                      label={`${ciudad.totalSucursales ?? 0} sucursales`}
+                      sx={{
+                        bgcolor: "#592B2B10",
+                        color: "#592B2B",
+                        fontWeight: 700,
+                        borderRadius: "10px",
+                      }}
+                    />
+                  </Box>
+                </Box>
+              </Card>
+            );
+          })}
+
+          {ciudades.length === 0 && (
+            <EmptyState icon={<Building size={32} />} text="No hay ciudades registradas" />
+          )}
+        </Box>
+      )}
     </Box>
   );
 
@@ -818,7 +824,7 @@ const MovimientoList = () => {
             title="Movimientos"
             renderActions={(row) => {
               if (!row) return null;
-              
+
               const vendido = Number(row.productoEstado) === 2;
 
               return (
@@ -864,8 +870,14 @@ const MovimientoList = () => {
 
   const renderContent = () => {
     // Para usuarios almacén
-    if (isAlmacen && !selectedSucursal) {
-      return <LoadingState text="Cargando datos de tu sucursal y almacenes..." />;
+    if (isAlmacen && !selectedAlmacen) {
+      return loadingAlmacenes ? (
+        <LoadingState text="Cargando datos de tu sucursal y almacenes..." />
+      ) : step === 2 && almacenes.length > 0 ? (
+        renderAlmacenStep()
+      ) : (
+        <LoadingState text="Cargando..." />
+      );
     }
 
     // Para administradores según el paso
@@ -876,15 +888,6 @@ const MovimientoList = () => {
 
     // Fallback seguro
     return renderCiudadStep();
-  };
-
-  // Validación segura para evitar errores de renderizado
-  const isStepValid = () => {
-    if (step === 0) return true;
-    if (step === 1) return selectedCiudad !== null;
-    if (step === 2) return selectedSucursal !== null;
-    if (step === 3) return selectedAlmacen !== null;
-    return true;
   };
 
   return (
@@ -906,9 +909,9 @@ const MovimientoList = () => {
 
           <Typography variant="body2" color="text.secondary">
             {isAlmacen
-              ? selectedSucursal && selectedAlmacen
+              ? selectedAlmacen && selectedSucursal
                 ? `Movimientos en ${selectedAlmacen.nombre}`
-                : "Selecciona tu almacén para ver los movimientos"
+                : "Cargando tu almacén..."
               : step === 0
               ? "Selecciona una ciudad para comenzar"
               : step === 1
@@ -943,7 +946,7 @@ const MovimientoList = () => {
         <WizardSteps step={step} />
       )}
 
-      {isStepValid() ? renderContent() : <LoadingState text="Cargando..." />}
+      {renderContent()}
 
       <MovimientoDetalleDialog
         open={!!selectedId}

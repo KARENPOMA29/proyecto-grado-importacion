@@ -502,30 +502,7 @@ const ProductList = () => {
           bgcolor: "white",
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Box
-            sx={{
-              width: 40,
-              height: 40,
-              borderRadius: "50%",
-              bgcolor: "#0D8C4720",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Package size={20} color="#0D8C47" />
-          </Box>
-
-          <Box>
-            <Typography variant="caption" color="text.secondary">
-              Total productos encontrados
-            </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: "#0D8C47" }}>
-              {total}
-            </Typography>
-          </Box>
-        </Box>
+        
       </Card>
 
       {errorMsg && (
