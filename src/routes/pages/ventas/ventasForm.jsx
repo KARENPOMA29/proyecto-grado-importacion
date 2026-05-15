@@ -92,10 +92,11 @@ const VentasForm = ({
   const [detalles, setDetalles] = useState(
     initialData?.detalles?.length
       ? initialData.detalles.map((d) => ({
-          productoId: d.productoId,
-          subtotal: Number(d.subtotal),
-        }))
-      : [{ productoId: "", subtotal: 0 }]
+        idTemp: crypto.randomUUID(),
+        productoId: d.productoId,
+        subtotal: Number(d.subtotal),
+      }))
+      : [{ idTemp: crypto.randomUUID(), productoId: "", subtotal: 0 }]
   );
 
   const [clientes, setClientes] = useState([]);
@@ -151,14 +152,14 @@ const VentasForm = ({
 
       if (!sucursalId) {
         setProductos([]);
-        setDetalles([{ productoId: "", subtotal: 0 }]);
+        setDetalles([{ idTemp: crypto.randomUUID(), productoId: "", subtotal: 0 }]);
         return;
       }
 
       try {
         setLoadingData(true);
         setProductos([]);
-        setDetalles([{ productoId: "", subtotal: 0 }]);
+        setDetalles([{ idTemp: crypto.randomUUID(), productoId: "", subtotal: 0 }]);
         setActiveDetalle(0);
 
         const data = await ServiceProducto.getDisponiblesPorSucursal(sucursalId);
@@ -225,13 +226,35 @@ const VentasForm = ({
       return;
     }
 
-    setDetalles((prev) => [...prev, { productoId: "", subtotal: 0 }]);
+    setDetalles((prev) => [
+      ...prev,
+      {
+        idTemp: crypto.randomUUID(),
+        productoId: "",
+        subtotal: 0,
+      },
+    ]);
     setActiveDetalle(detalles.length);
   };
 
   const removeDetalle = (idx) => {
-    setDetalles((prev) => prev.filter((_, i) => i !== idx));
-    if (activeDetalle === idx) setActiveDetalle(0);
+    setDetalles((prev) => {
+      const updated = prev.filter((_, i) => i !== idx);
+
+      if (updated.length === 0) {
+        return [
+          {
+            idTemp: crypto.randomUUID(),
+            productoId: "",
+            subtotal: 0,
+          },
+        ];
+      }
+
+      return updated;
+    });
+
+    setActiveDetalle(0);
   };
 
   const validateForm = () => {
@@ -376,11 +399,13 @@ const handleSubmit = async () => {
 
       if (activeDetalle !== null && copy[activeDetalle]) {
         copy[activeDetalle] = {
+          ...copy[activeDetalle],
           productoId: producto.id,
           subtotal: Number(producto.precio),
         };
       } else {
         copy.push({
+          idTemp: crypto.randomUUID(),
           productoId: producto.id,
           subtotal: Number(producto.precio),
         });
@@ -449,7 +474,8 @@ const handleSubmit = async () => {
         onClose={onClose}
         maxWidth="xl"
         fullWidth
-        PaperProps={{
+        slotProps={{
+        paper: {
           sx: {
             borderRadius: { xs: 0, sm: 4 },
             overflow: "hidden",
@@ -459,7 +485,8 @@ const handleSubmit = async () => {
             height: { xs: "100dvh", sm: "92vh" },
             maxHeight: { xs: "100dvh", sm: "92vh" },
           },
-        }}
+        },
+      }}
       >
         <BarcodeListener
           onScan={handleScan}
@@ -899,7 +926,7 @@ const handleSubmit = async () => {
                   <Box sx={{ display: "grid", gap: 1.7 }}>
                     {detalles.map((d, idx) => (
                       <ProductRow
-                        key={idx}
+                        key={d.idTemp || `${d.productoId}-${idx}`}
                         d={d}
                         idx={idx}
                         activeDetalle={activeDetalle}
@@ -1010,10 +1037,12 @@ const handleSubmit = async () => {
         }}
         maxWidth="xs"
         fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 4,
-            p: 1,
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: 4,
+              p: 1,
+            },
           },
         }}
       >
@@ -1084,8 +1113,7 @@ const handleSubmit = async () => {
         open={showSuccess}
         message="La venta se registró correctamente"
       />
-    </>
-    
+    </>    
   );
 };
 

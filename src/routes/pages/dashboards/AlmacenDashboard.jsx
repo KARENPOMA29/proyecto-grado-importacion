@@ -12,24 +12,14 @@ import CategoriaList from "@/routes/pages/categoria/categoriaList";
 import SeccionList from "@/routes/pages/seccion/seccionList";
 import ImportList from "@/routes/pages/importaciones/ImportacionList";
 
-
+import EmpleadoInicioDashboard from "./EmpleadoInicioDashboard";
 
 
 export default function AlmacenDashboard() {
   return (
     <DashboardLayout title="Panel de Almacén" menuItems={almacenMenu}>
       <Routes>
-        <Route
-          index
-          element={
-            <>
-              <Typography variant="h5" gutterBottom>
-                Inventario y Movimientos
-              </Typography>
-              <Typography>Gestiona ingresos, salidas y alertas de stock.</Typography>
-            </>
-          }
-        />
+        <Route index element={<EmpleadoInicioDashboard />} />
 
         {/* PRINCIPAL */}
         <Route path="inventario" element={<InventarioList />} />

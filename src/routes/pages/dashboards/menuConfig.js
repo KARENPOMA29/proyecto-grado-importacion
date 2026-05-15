@@ -16,23 +16,20 @@ export const adminMenu = [
   { label: "Importaciones", icon: LocalShippingIcon, to: "/admin/importaciones", group: "Principal" },
   { label: "Entradas", icon: InventoryIcon, to: "/admin/inventario", group: "Principal" },
   { label: "Productos", icon: InventoryIcon, to: "/admin/productos", group: "Principal" },
+  { label: "Sucursales", icon: StoreIcon, to: "/admin/sucursales", group: "Principal" },
 
   // GESTIÓN
   { label: "Clientes", icon: GroupIcon, to: "/admin/clientes", group: "Gestión" },
   { label: "Proveedores", icon: LocalShippingIcon, to: "/admin/proveedores", group: "Gestión" },
   { label: "Empleados", icon: PeopleIcon, to: "/admin/empleados", group: "Gestión" },
   { label: "Modelos de Producto", icon: InventoryIcon, to: "/admin/modelos", group: "Gestión" },
-  { label: "Sucursales", icon: StoreIcon, to: "/admin/sucursales", group: "Gestión" },
   { label: "Categorías", icon: AssessmentIcon, to: "/admin/categorias", group: "Gestión" },
   { label: "Almacenes", icon: InventoryIcon, to: "/admin/almacenes", group: "Gestión" },
-  { label: "Secciones", icon: AssessmentIcon, to: "/admin/secciones", group: "Gestión" },
 
-  // SISTEMA
-  { label: "Reporte de Importaciones", icon: AssessmentIcon, to: "/admin/reportes/Importacion", group: "Sistema" },
-  { label: "Reporte de Ventas", icon: AssessmentIcon, to: "/admin/reportes/ventas", group: "Sistema" },
-  { label: "Reporte de Inventario", icon: AssessmentIcon, to: "/admin/reportes/inventario", group: "Sistema" },
-
-  { label: "Configuración", icon: SettingsIcon, to: "/admin/configuracion", group: "Sistema" },
+  // REPORTES
+  { label: "Reporte de Importaciones", icon: AssessmentIcon, to: "/admin/reportes/Importacion", group: "Reportes" },
+  { label: "Reporte de Ventas", icon: AssessmentIcon, to: "/admin/reportes/ventas", group: "Reportes" },
+  { label: "Reporte de Inventario", icon: AssessmentIcon, to: "/admin/reportes/inventario", group: "Reportes" },
   ];
 // --- VENTAS ---
 export const ventasMenu = [
@@ -43,14 +40,12 @@ export const ventasMenu = [
   // GESTIÓN
   { label: "Clientes", icon: GroupIcon, to: "/ventas/clientes", group: "Gestión" },
 
-  // SISTEMA
-  { label: "Reportes", icon: AssessmentIcon, to: "/ventas/reportes", group: "Sistema" },
 ];
 
 // --- PILOTERO ---
 export const pilotoMenu = [
   // PRINCIPAL
-
+  { label: "Resumen", icon: DashboardIcon, to: "/pilotero", group: "Principal" },
   { label: "Importaciones", icon: LocalShippingIcon, to: "/pilotero/importaciones", group: "Principal" },
   { label: "Proveedores", icon: GroupIcon, to: "/pilotero/proveedores", group: "Principal" },
 ];
@@ -63,13 +58,12 @@ export const almacenMenu = [
   { label: "Resumen", icon: DashboardIcon, to: "/almacen", group: "Principal" },
   { label: "Entradas", icon: InventoryIcon, to: "/almacen/inventario", group: "Principal" },
   { label: "Importaciones", icon: LocalShippingIcon, to: "/almacen/importaciones", group: "Principal" },
+  { label: "Sucursales", icon: StoreIcon, to: "/almacen/sucursales", group: "Principal" },
 
   // GESTIÓN
   { label: "Modelos de Producto", icon: InventoryIcon, to: "/almacen/modelos", group: "Gestión" },
-  { label: "Sucursales", icon: StoreIcon, to: "/almacen/sucursales", group: "Gestión" },
   { label: "Categorías", icon: AssessmentIcon, to: "/almacen/categorias", group: "Gestión" },
   { label: "Almacenes", icon: InventoryIcon, to: "/almacen/almacenes", group: "Gestión" },
-  { label: "Secciones", icon: AssessmentIcon, to: "/almacen/secciones", group: "Gestión" },
 ];
 
 

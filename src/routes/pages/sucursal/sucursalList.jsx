@@ -40,12 +40,32 @@ const SucursalList = () => {
   const [ciudadFiltro, setCiudadFiltro] = useState("");
   const [ciudades, setCiudades] = useState([]);
   const { user } = useAuth();
-  const roleKey = (user?.rol || "").trim().toLowerCase();
+  const roleKey = (
+    user?.rolKey ||
+    user?.role ||
+    user?.rol ||
+    user?.perfil?.rol ||
+    user?.perfil?.nombre ||
+    ""
+  )
+    .toString()
+    .trim()
+    .toLowerCase();
 
-  const canCreate = roleKey === "administrador" || roleKey === "almacen";
-  const canEdit = roleKey === "administrador" || roleKey === "almacen";
-  const canDelete = roleKey === "administrador";
+  const isAdmin = roleKey === "administrador";
+  const isAlmacen = roleKey === "almacen";
 
+  const empleadoSucursalId =
+    user?.idSucursal ??
+    user?.sucursalId ??
+    user?.empleado?.idSucursal ??
+    user?.empleado?.sucursalId ??
+    user?.empleado?.sucursal?.id ??
+    null;
+
+  const canCreate = isAdmin;
+  const canEdit = isAdmin;
+  const canDelete = isAdmin;
   // Campos para DetailsDialog
   const fields = [
     { label: "Nombre", key: "nombre" },
@@ -59,6 +79,8 @@ const SucursalList = () => {
     },
   ];
   const fetchCiudades = async () => {
+    if (!isAdmin) return;
+
     try {
       const res = await ServiceCiudad.getAll();
       setCiudades(res.items || []);
@@ -69,12 +91,33 @@ const SucursalList = () => {
   const fetchSucursales = async () => {
     try {
       setLoading(true);
+
       const params = {};
-      if (ciudadFiltro) {
+
+      if (isAlmacen) {
+        if (!empleadoSucursalId) {
+          setSucursales([]);
+          toast.error("Tu usuario no tiene una sucursal asignada.");
+          return;
+        }
+
+        params.sucursalId = empleadoSucursalId;
+      }
+
+      if (isAdmin && ciudadFiltro) {
         params.ciudadId = ciudadFiltro;
       }
+
       const res = await ServiceSucursal.getAll(params);
-      setSucursales(res.items || []);
+      const lista = res.items || [];
+
+      if (isAlmacen) {
+        setSucursales(
+          lista.filter((s) => Number(s.id) === Number(empleadoSucursalId))
+        );
+      } else {
+        setSucursales(lista);
+      }
     } catch (error) {
       toast.error(error.message || "Error al cargar sucursales");
     } finally {
@@ -82,12 +125,13 @@ const SucursalList = () => {
     }
   };
   useEffect(() => {
-    fetchCiudades();
-  }, []);
-
+    if (isAdmin) {
+      fetchCiudades();
+    }
+  }, [isAdmin]);
   useEffect(() => {
     fetchSucursales();
-  }, [ciudadFiltro]);
+  }, [ciudadFiltro, isAdmin, isAlmacen, empleadoSucursalId]);
 
   const handleDelete = async () => {
     try {
@@ -171,37 +215,39 @@ const SucursalList = () => {
           </Button>
         )}
       </Box>
-    <Box
-      sx={{
-        mb: 3,
-        display: "flex",
-        justifyContent: "flex-start",
-      }}
-    >
-      <TextField
-        select
-        size="small"
-        label="Filtrar por ciudad"
-        value={ciudadFiltro}
-        onChange={(e) => setCiudadFiltro(e.target.value)}
-        sx={{
-          width: 280,
-          bgcolor: "#fff",
-          borderRadius: 2,
-          "& .MuiOutlinedInput-root": {
-            borderRadius: 2,
-          },
-        }}
-      >
-        <MenuItem value="">Todas las ciudades</MenuItem>
+      {isAdmin && (
+        <Box
+          sx={{
+            mb: 3,
+            display: "flex",
+            justifyContent: "flex-start",
+          }}
+        >
+          <TextField
+            select
+            size="small"
+            label="Filtrar por ciudad"
+            value={ciudadFiltro}
+            onChange={(e) => setCiudadFiltro(e.target.value)}
+            sx={{
+              width: 280,
+              bgcolor: "#fff",
+              borderRadius: 2,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: 2,
+              },
+            }}
+          >
+            <MenuItem value="">Todas las ciudades</MenuItem>
 
-        {ciudades.map((c) => (
-          <MenuItem key={c.id} value={c.id}>
-            {c.nombre}
-          </MenuItem>
-        ))}
-      </TextField>
-    </Box>
+            {ciudades.map((c) => (
+              <MenuItem key={c.id} value={c.id}>
+                {c.nombre}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Box>
+      )}
       {/* LOADING */}
       {loading && (
         <Box sx={{ py: 6, display: "flex", justifyContent: "center" }}>

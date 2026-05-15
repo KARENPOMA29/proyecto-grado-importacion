@@ -20,14 +20,13 @@ import {
 } from "@mui/material";
 import { useForm, Controller } from "react-hook-form";
 import ServiceAlmacen from "@/services/ServiceAlmacen";
-
 const AlmacenForm = ({
   onClose,
   onSuccess,
   initialData = null,
   sucursales = [],
-  // 👇 sucursal desde donde se abrió (ej: diálogo por sucursal)
   sucursalContext = null,
+  bloquearSucursal = false,
 }) => {
   const {
     control,
@@ -39,32 +38,32 @@ const AlmacenForm = ({
     reValidateMode: "onChange", // revalida al escribir
     defaultValues: { nombre: "", direccion: "", sucursalId: "" },
   });
-
+  
   const [formError, setFormError] = useState("");
   const [loading, setLoading] = useState(false);
 
   // ⏱ Cargar datos iniciales / sucursal por contexto
   useEffect(() => {
     if (initialData) {
-      // 🟢 Editar
       setValue("nombre", initialData.nombre ?? "");
       setValue("direccion", initialData.direccion ?? "");
-      setValue("sucursalId", initialData.sucursalId ?? "");
+
+      const sucursalFija =
+        sucursalContext?.id ?? initialData.sucursalId ?? "";
+
+      setValue("sucursalId", sucursalFija);
     } else if (sucursalContext) {
-      // 🟢 Crear desde una sucursal específica
       reset({
         nombre: "",
         direccion: "",
-        sucursalId: sucursalContext.id, // 👈 preseleccionado
+        sucursalId: sucursalContext.id,
       });
     } else {
-      // 🟢 Crear normal desde lista de almacenes
       reset({ nombre: "", direccion: "", sucursalId: "" });
     }
 
     setFormError("");
   }, [initialData, sucursalContext, setValue, reset]);
-
   const onSubmit = async (data) => {
     setFormError("");
 
@@ -110,6 +109,7 @@ const AlmacenForm = ({
       setLoading(false);
     }
   };
+
 
   const handleNombreChange = (e, onChangeRHForm) => {
     const value = e.target.value.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ0-9 .-]/g, "");
@@ -258,7 +258,7 @@ const AlmacenForm = ({
                     fullWidth
                     size="small"
                     error={!!fieldState.error}
-                    disabled={loading || !!sucursalContext}
+                    disabled={loading || bloquearSucursal || !!sucursalContext}
                   >
                     <InputLabel id="sucursal-label">
                       Sucursal *

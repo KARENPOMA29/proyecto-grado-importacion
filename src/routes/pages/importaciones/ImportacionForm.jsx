@@ -32,7 +32,16 @@ const todayLocalISO = () => {
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
 };
+const tomorrowLocalISO = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
 
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+
+  return `${yyyy}-${mm}-${dd}`;
+};
 const parseLocalDate = (value) => {
   if (!value) return null;
   const [yyyy, mm, dd] = value.slice(0, 10).split("-").map(Number);
@@ -340,22 +349,33 @@ export default function ImportacionForm({
                 <TextField
                   fullWidth
                   size="small"
-                  label="Fecha de llegada"
                   type="date"
                   value={form.fechaLlegada}
                   onChange={(e) => handle("fechaLlegada", e.target.value)}
                   required
                   disabled={loading}
-                  InputLabelProps={{ shrink: true }}
                   inputProps={{
-                    min: todayLocalISO(),
+                    min: tomorrowLocalISO(),
+                    "aria-label": "Fecha de llegada",
                   }}
-                  error={touched.fechaLlegada && !form.fechaLlegada}
-                  helperText={
-                    touched.fechaLlegada && !form.fechaLlegada
-                      ? "Seleccione una fecha"
-                      : "Debe ser posterior a hoy"
+                  error={
+                    touched.fechaLlegada &&
+                    (!form.fechaLlegada || !esFechaPosteriorAHoy(form.fechaLlegada))
                   }
+                  helperText="Fecha de llegada · Debe ser posterior a hoy"
+                  sx={{
+                    "& .MuiInputBase-root": {
+                      height: 50,
+                      backgroundColor: "#FFFFFF",
+                    },
+                    "& input": {
+                      fontSize: "1rem",
+                      color: "#6B7280",
+                    },
+                    "& input:valid": {
+                      color: "#1F2937",
+                    },
+                  }}
                 />
               </Grid>
 

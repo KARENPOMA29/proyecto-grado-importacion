@@ -6,6 +6,7 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import { pilotoMenu } from "./menuConfig";
 import ImportList from "@/routes/pages/importaciones/ImportacionList";
 import ProveedorList from "@/routes/pages/proveedor/proveedorlist";
+import EmpleadoInicioDashboard from "./EmpleadoInicioDashboard";
 const Envios = () => (
   <>
     <Typography variant="h6" gutterBottom>
@@ -32,19 +33,7 @@ export default function PilotoDashboard() {
   return (
     <DashboardLayout title="Panel de Pilotero" menuItems={pilotoMenu}>
       <Routes>
-        <Route
-          index
-          element={
-            <>
-              <Typography variant="h5" gutterBottom>
-                Rutas y Entregas
-              </Typography>
-              <Typography>
-                Monitorea tus entregas e importaciones asignadas en tiempo real.
-              </Typography>
-            </>
-          }
-        />
+        <Route index element={<EmpleadoInicioDashboard />} />
         <Route path="importaciones" element={<ImportList />} />
         <Route path="proveedores" element={<ProveedorList />} />
 

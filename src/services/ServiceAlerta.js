@@ -11,9 +11,14 @@ const ServiceAlerta = {
     return res.data;
   },
 
-  // 👇 nuevo método para marcar como leída
   async marcarLeida(id) {
     const res = await api.put(`${resource}/${id}/leer`);
+    return res.data;
+  },
+
+  // 🔥 NUEVO: verifica stock bajo desde el front
+  async verificarStockBajo() {
+    const res = await api.post(`${resource}/verificar-stock-bajo`);
     return res.data;
   },
 };

@@ -38,7 +38,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
     rol:
       typeof initialData?.rol === "string"
         ? initialData.rol
-        : initialData?.rol?.value || ROLES[0], // 👈 por defecto Administrador
+        : initialData?.rol?.value || ROLES[0],
     usuario: initialData?.usuario || "",
     contrasena: "",
     correo: initialData?.correo || "",
@@ -51,7 +51,6 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
   const [loading, setLoading] = useState(false);
   const [subiendoImagen, setSubiendoImagen] = useState(false);
 
-  // touched por campo
   const [touched, setTouched] = useState({
     ci: false,
     nombre: false,
@@ -64,18 +63,16 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
     contrasena: false,
   });
 
-  // CI en tiempo real
   const [checkingCi, setCheckingCi] = useState(false);
   const [ciError, setCiError] = useState("");
   const [ciExists, setCiExists] = useState(false);
 
-  // Sucursales
   const [sucursales, setSucursales] = useState([]);
   const [loadingSucursales, setLoadingSucursales] = useState(false);
 
   const roles = useMemo(() => ROLES, []);
 
-  // 🔹 subir imagen
+  // 🔹 Subir imagen
   const handleImagenChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -85,8 +82,6 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
       setFormError("");
 
       const resp = await ServiceEmpleado.uploadImagen(file);
-      // resp = { urlImagen: "/archivos/empleados/xxxx.jpg" }
-
       setForm((prev) => ({
         ...prev,
         urlImagen: resp.urlImagen,
@@ -102,7 +97,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
     }
   };
 
-  // 🔹 armar URL final para la imagen
+  // 🔹 Armar URL final para la imagen
   const getImageSrc = (url) => {
     if (!url) return "";
 
@@ -125,7 +120,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
     let newValue = value;
 
     if (field === "ci" || field === "telefono") {
-      newValue = String(value || "").replace(/\D/g, ""); // solo números
+      newValue = String(value || "").replace(/\D/g, "");
     }
 
     setForm((prev) => ({ ...prev, [field]: newValue }));
@@ -183,7 +178,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
     }
   }, [form.nombre, form.apellido, form.ci, initialData]);
 
-  // 🧠 Debounce para verificar CI en tiempo real sin parpadeos
+  // 🧠 Debounce para verificar CI en tiempo real
   useEffect(() => {
     const originalCi = initialData?.ci
       ? String(initialData.ci).replace(/\D/g, "")
@@ -354,7 +349,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
     }
   };
 
-  // sucursal seleccionada (objeto) a partir de idSucursal
+  // Sucursal seleccionada (objeto) a partir de idSucursal
   const sucursalSeleccionada =
     sucursales.find((s) => s.id === form.idSucursal) || null;
 
@@ -366,22 +361,22 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
       fullWidth
       PaperProps={{ className: "dialog-paper" }}
     >
-  <DialogTitle
-    sx={{
-      p: 2.5,
-      pb: 2,
-      background: "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
-      color: "#F5F5F5",
-    }}
-  >
-    <Typography component="div" variant="h6" fontWeight={700}>
-      {isEdit ? "Editar Empleado" : "Nuevo Empleado"}
-    </Typography>
+      <DialogTitle
+        sx={{
+          p: 2.5,
+          pb: 2,
+          background: "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
+          color: "#F5F5F5",
+        }}
+      >
+        <Typography component="div" variant="h6" fontWeight={700}>
+          {isEdit ? "Editar Empleado" : "Nuevo Empleado"}
+        </Typography>
 
-    <Typography component="div" variant="body2" sx={{ opacity: 0.9, mt: 0.5 }}>
-      Complete la información del empleado.
-    </Typography>
-  </DialogTitle>
+        <Typography component="div" variant="body2" sx={{ opacity: 0.9, mt: 0.5 }}>
+          Complete la información del empleado.
+        </Typography>
+      </DialogTitle>
 
       <DialogContent dividers className="dialog-content">
         <Box className="form-container">
@@ -398,7 +393,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                   Información Personal
                 </Typography>
                 <Grid container spacing={3} className="form-grid">
-                  {/* CI PRIMERO */}
+                  {/* CI */}
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
@@ -425,14 +420,17 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                       inputProps={{ maxLength: 8 }}
                       className="text-field"
                       size="medium"
-                      InputProps={{
-                        endAdornment: checkingCi ? (
-                          <CircularProgress size={20} />
-                        ) : null,
+                      slotProps={{
+                        input: {
+                          endAdornment: checkingCi ? (
+                            <CircularProgress size={20} />
+                          ) : null,
+                        },
                       }}
                     />
                   </Grid>
 
+                  {/* Nombre */}
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
@@ -457,6 +455,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                     />
                   </Grid>
 
+                  {/* Apellido */}
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
@@ -481,6 +480,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                     />
                   </Grid>
 
+                  {/* Segundo Apellido */}
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
@@ -511,6 +511,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                   Contacto, Rol y Sucursal
                 </Typography>
                 <Grid container spacing={3} className="form-grid">
+                  {/* Teléfono */}
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
@@ -580,7 +581,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                     />
                   </Grid>
 
-                  {/* Sucursal */}
+                  {/* Sucursal - CORREGIDO */}
                   <Grid item xs={12} md={6}>
                     <Autocomplete
                       options={sucursales}
@@ -590,45 +591,69 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                         handleChange("idSucursal", newValue?.id || null)
                       }
                       getOptionLabel={(option) => option?.nombre || ""}
-                      isOptionEqualToValue={(opt, val) =>
-                        opt?.id === val?.id
-                      }
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          label="Sucursal"
-                          required
-                          onBlur={() =>
-                            setTouched((prev) => ({
-                              ...prev,
-                              idSucursal: true,
-                            }))
-                          }
-                          error={
-                            (touched.idSucursal || formTouched) &&
-                            !form.idSucursal
-                          }
-                          helperText={
-                            (touched.idSucursal || formTouched) &&
-                            !form.idSucursal
-                              ? "Seleccione una sucursal"
-                              : "Sucursal donde trabaja el empleado"
-                          }
-                          InputProps={{
-                            ...params.InputProps,
-                            endAdornment: (
-                              <>
-                                {loadingSucursales ? (
-                                  <CircularProgress size={18} />
-                                ) : null}
-                                {params.InputProps.endAdornment}
-                              </>
-                            ),
-                          }}
-                          className="text-field"
-                          size="medium"
-                        />
-                      )}
+                      isOptionEqualToValue={(opt, val) => opt?.id === val?.id}
+                      renderInput={(params) => {
+                        if (!params) {
+                          return (
+                            <TextField
+                              label="Sucursal"
+                              required
+                              disabled={loading || loadingSucursales}
+                              error={
+                                (touched.idSucursal || formTouched) &&
+                                !form.idSucursal
+                              }
+                              helperText={
+                                (touched.idSucursal || formTouched) &&
+                                !form.idSucursal
+                                  ? "Seleccione una sucursal"
+                                  : "Sucursal donde trabaja el empleado"
+                              }
+                              className="text-field"
+                              size="medium"
+                            />
+                          );
+                        }
+
+                        return (
+                          <TextField
+                            {...params}
+                            label="Sucursal"
+                            required
+                            onBlur={() =>
+                              setTouched((prev) => ({
+                                ...prev,
+                                idSucursal: true,
+                              }))
+                            }
+                            error={
+                              (touched.idSucursal || formTouched) &&
+                              !form.idSucursal
+                            }
+                            helperText={
+                              (touched.idSucursal || formTouched) &&
+                              !form.idSucursal
+                                ? "Seleccione una sucursal"
+                                : "Sucursal donde trabaja el empleado"
+                            }
+                            slotProps={{
+                              input: {
+                                ...params.InputProps,
+                                endAdornment: (
+                                  <>
+                                    {loadingSucursales ? (
+                                      <CircularProgress size={18} />
+                                    ) : null}
+                                    {params.InputProps?.endAdornment}
+                                  </>
+                                ),
+                              },
+                            }}
+                            className="text-field"
+                            size="medium"
+                          />
+                        );
+                      }}
                       disabled={loading || loadingSucursales}
                     />
                   </Grid>
@@ -649,16 +674,12 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                       error={
                         (touched.correo || formTouched) &&
                         (!form.correo ||
-                          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-                            form.correo
-                          ))
+                          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo))
                       }
                       helperText={
                         (touched.correo || formTouched) &&
                         (!form.correo ||
-                          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-                            form.correo
-                          ))
+                          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo))
                           ? "Ingrese un correo válido (ej: usuario@dominio.com)"
                           : "Dirección de correo institucional"
                       }
@@ -684,6 +705,7 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                   Credenciales de Acceso
                 </Typography>
                 <Grid container spacing={3} className="form-grid">
+                  {/* Usuario */}
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
@@ -705,14 +727,15 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                       }
                       required
                       disabled={loading || isEdit}
-                      InputProps={{ readOnly: isEdit }}
-                      className={`text-field ${
-                        isEdit ? "readonly-field" : ""
-                      }`}
+                      slotProps={{
+                        input: { readOnly: isEdit },
+                      }}
+                      className={`text-field ${isEdit ? "readonly-field" : ""}`}
                       size="medium"
                     />
                   </Grid>
 
+                  {/* Contraseña Temporal */}
                   {!initialData && (
                     <Grid item xs={12} md={6}>
                       <TextField
@@ -724,7 +747,10 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                           handleChange("contrasena", e.target.value)
                         }
                         onBlur={() =>
-                          setTouched((prev) => ({ ...prev, contrasena: true }))
+                          setTouched((prev) => ({
+                            ...prev,
+                            contrasena: true,
+                          }))
                         }
                         error={
                           (touched.contrasena || formTouched) &&
@@ -738,7 +764,9 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                         }
                         required
                         disabled={loading}
-                        InputProps={{ readOnly: true }}
+                        slotProps={{
+                          input: { readOnly: true },
+                        }}
                         className="text-field readonly-field"
                         size="medium"
                       />
@@ -748,10 +776,15 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
               </CardContent>
             </Card>
 
-            {/* Info adicional / imagen */}
+            {/* Foto del Empleado */}
             <Card className="section-card">
               <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" fontWeight={600} gutterBottom className="section-title">
+                <Typography
+                  variant="h6"
+                  fontWeight={600}
+                  gutterBottom
+                  className="section-title"
+                >
                   Foto del Empleado
                 </Typography>
 
@@ -797,8 +830,12 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                   </Box>
 
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
-                      Suba una imagen del empleado para mostrarla en el listado y en los detalles.
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "text.secondary", mb: 2 }}
+                    >
+                      Suba una imagen del empleado para mostrarla en el listado
+                      y en los detalles.
                     </Typography>
 
                     <Button
@@ -818,14 +855,22 @@ const EmpleadoForm = ({ onClose, onSuccess, initialData = null }) => {
                         },
                       }}
                     >
-                      {subiendoImagen ? "Subiendo imagen..." : "Subir foto de perfil"}
-                      <input type="file" hidden accept="image/*" onChange={handleImagenChange} />
+                      {subiendoImagen
+                        ? "Subiendo imagen..."
+                        : "Subir foto de perfil"}
+                      <input
+                        type="file"
+                        hidden
+                        accept="image/*"
+                        onChange={handleImagenChange}
+                      />
                     </Button>
                   </Box>
                 </Box>
               </CardContent>
             </Card>
 
+            {/* Alertas */}
             {formError && (
               <Alert severity="error" className="alert-message">
                 <Typography

@@ -88,61 +88,131 @@ const MovimientoList = () => {
   const isAlmacen = roleKey === "almacen";
 
   const empleadoSucursalId =
-    user?.idSucursal ?? user?.sucursalId ?? user?.empleado?.sucursalId ?? null;
-
-  const usuarioIdLogueado =
+    user?.idSucursal ??
+    user?.sucursalId ??
+    user?.empleado?.idSucursal ??
+    user?.empleado?.sucursalId ??
+    user?.empleado?.sucursal?.id ??
+    null;
+    const usuarioIdLogueado =
     user?.empleadoId ?? user?.idEmpleado ?? user?.id ?? null;
 
   const canCreate = isAdmin || isAlmacen;
+  const canEdit = isAdmin;
   const canDelete = isAdmin;
 
   // Cargar ciudades al iniciar
+// Cargar ciudades SOLO para admin
   useEffect(() => {
+    if (!isAdmin) {
+      setLoadingCiudades(false);
+      return;
+    }
+
+    let activo = true;
+
     const cargarCiudades = async () => {
       try {
         setLoadingCiudades(true);
         const res = await ServiceCiudad.getAll?.();
+
+        if (!activo) return;
+
         setCiudades(Array.isArray(res) ? res : res?.items ?? []);
         setStep(0);
       } catch (error) {
+        if (!activo) return;
         console.error(error);
         toast.error("Error al cargar ciudades");
         setCiudades([]);
       } finally {
-        setLoadingCiudades(false);
+        if (activo) setLoadingCiudades(false);
       }
     };
 
     cargarCiudades();
-  }, []);
 
-  // Cargar datos del almacén para usuarios almaceneros
+    return () => {
+      activo = false;
+    };
+  }, [isAdmin]);
+
+  // Cargar datos seguros para rol almacén
   useEffect(() => {
-    if (!isAlmacen || !empleadoSucursalId) return;
+    if (!isAlmacen) return;
+
+    let activo = true;
+
+    const normalizarLista = (res) => {
+      if (Array.isArray(res)) return res;
+      if (Array.isArray(res?.items)) return res.items;
+      if (Array.isArray(res?.data)) return res.data;
+      return [];
+    };
 
     const cargarDatosAlmacen = async () => {
       try {
         setLoadingAlmacenes(true);
-        const sucursal = await ServiceSucursal.getById(empleadoSucursalId);
-        setSelectedSucursal(sucursal);
-        setSelectedCiudad(sucursal.ciudad || null);
+        setStep(2);
 
-        const res = await ServiceAlmacen.getAll({
-          sucursalId: sucursal.id,
+        if (!empleadoSucursalId) {
+          toast.error("El usuario no tiene una sucursal asignada.");
+          setSelectedSucursal(null);
+          setSelectedCiudad(null);
+          setSelectedAlmacen(null);
+          setAlmacenes([]);
+          return;
+        }
+
+        const sucursal = await ServiceSucursal.getById(empleadoSucursalId);
+
+        const resAlmacenes = await ServiceAlmacen.getAll({
+          sucursalId: empleadoSucursalId,
+          page: 1,
+          pageSize: 100,
         });
 
-        setAlmacenes(Array.isArray(res) ? res : res.items ?? []);
-        setStep(2);
+        if (!activo) return;
+
+        const lista = normalizarLista(resAlmacenes).filter(
+          (almacen) =>
+            Number(almacen.estado ?? 1) === 1 &&
+            Number(almacen.sucursalId ?? almacen.sucursal?.id) ===
+              Number(empleadoSucursalId)
+        );
+
+        setSelectedSucursal(sucursal);
+        setSelectedCiudad(sucursal?.ciudad || null);
+        setAlmacenes(lista);
+
+        if (lista.length > 0) {
+          setSelectedAlmacen(lista[0]);
+          setStep(3);
+        } else {
+          setSelectedAlmacen(null);
+          setStep(2);
+        }
       } catch (error) {
-        console.error(error);
-        toast.error("No se pudo cargar la sucursal o almacenes asignados");
+        if (!activo) return;
+
+        console.error("Error cargando almacén del usuario:", error);
+        toast.error("No se pudo cargar tu almacén.");
+        setAlmacenes([]);
+        setSelectedAlmacen(null);
+        setStep(2);
       } finally {
-        setLoadingAlmacenes(false);
+        if (activo) setLoadingAlmacenes(false);
       }
     };
 
     cargarDatosAlmacen();
+
+    return () => {
+      activo = false;
+    };
   }, [isAlmacen, empleadoSucursalId]);
+
+
 
   const handleSelectCiudad = async (ciudad) => {
     try {
@@ -838,7 +908,7 @@ const MovimientoList = () => {
                     <Eye size={16} />
                   </IconButton>
 
-                  {!vendido && (
+                  {canEdit && !vendido && (
                     <IconButton
                       size="small"
                       onClick={() => setEditId(row.id)}
@@ -869,24 +939,36 @@ const MovimientoList = () => {
   );
 
   const renderContent = () => {
-    // Para usuarios almacén
-    if (isAlmacen && !selectedAlmacen) {
-      return loadingAlmacenes ? (
-        <LoadingState text="Cargando datos de tu sucursal y almacenes..." />
-      ) : step === 2 && almacenes.length > 0 ? (
-        renderAlmacenStep()
-      ) : (
-        <LoadingState text="Cargando..." />
+    if (isAlmacen) {
+      if (loadingAlmacenes) {
+        return <LoadingState text="Cargando datos de tu sucursal y almacenes..." />;
+      }
+
+      if (!empleadoSucursalId) {
+        return (
+          <EmptyState
+            icon={<Store size={32} />}
+            text="Tu usuario no tiene una sucursal asignada."
+          />
+        );
+      }
+
+      if (step === 2) return renderAlmacenStep();
+      if (step === 3 && selectedAlmacen) return renderMovimientosStep();
+
+      return (
+        <EmptyState
+          icon={<Boxes size={32} />}
+          text="No se encontró un almacén disponible para tu sucursal."
+        />
       );
     }
 
-    // Para administradores según el paso
     if (step === 0) return renderCiudadStep();
     if (step === 1) return renderSucursalStep();
     if (step === 2) return renderAlmacenStep();
     if (step === 3) return renderMovimientosStep();
 
-    // Fallback seguro
     return renderCiudadStep();
   };
 
@@ -911,7 +993,7 @@ const MovimientoList = () => {
             {isAlmacen
               ? selectedAlmacen && selectedSucursal
                 ? `Movimientos en ${selectedAlmacen.nombre}`
-                : "Cargando tu almacén..."
+                : ""
               : step === 0
               ? "Selecciona una ciudad para comenzar"
               : step === 1

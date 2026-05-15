@@ -34,7 +34,7 @@ export const brand = {
   50: "#FDF8F8",
 };
 
-export const MotionCard = motion(Card);
+export const MotionCard = Card;
 
 export const sxCard = {
   borderRadius: 4,
@@ -337,9 +337,6 @@ export const ProductRow = ({
   return (
     <Box
       component={motion.div}
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22, delay: idx * 0.04 }}
       sx={{
         borderRadius: 4,
         border: "1px solid",
@@ -446,10 +443,15 @@ export const ProductRow = ({
                   i === idx
                     ? val
                       ? {
+                          ...item,
                           productoId: val.id,
                           subtotal: Number(val.precio ?? val.precioOrigen ?? 0),
                         }
-                      : { productoId: "", subtotal: 0 }
+                      : {
+                          ...item,
+                          productoId: "",
+                          subtotal: 0,
+                        }
                     : item
                 )
               );
@@ -653,7 +655,13 @@ export const ProductRow = ({
                 ? "Precio muy alto"
                 : `Base: Bs ${precioBase.toFixed(2)}`
             }
-            inputProps={{ min: 1, max: maxRazonable, step: "0.01" }}
+            slotProps={{
+              htmlInput: {
+                min: 1,
+                max: maxRazonable,
+                step: "0.01",
+              },
+            }}
             sx={{
               "& .MuiOutlinedInput-root": {
                 minHeight: 50,
@@ -779,9 +787,6 @@ export const VentaResumen = ({
               <Box
                 key={prod.id}
                 component={motion.div}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2, delay: index * 0.03 }}
                 sx={{
                   p: 1.45,
                   borderRadius: 3,

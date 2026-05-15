@@ -20,16 +20,48 @@ const AlmacenList = () => {
   const gridRef = useRef(null);
 
   const { user } = useAuth();
-  const roleKey = (user?.rol || "").trim().toLowerCase(); // "Almacen" -> "almacen"
+    const roleKey = (
+    user?.rolKey ||
+    user?.role ||
+    user?.rol ||
+    user?.perfil?.rol ||
+    user?.perfil?.nombre ||
+    ""
+  )
+    .toString()
+    .trim()
+    .toLowerCase();
 
-  const canCreate = roleKey === "administrador" || roleKey === "almacen";
-  const canEdit = roleKey === "administrador" || roleKey === "almacen";
-  const canDelete = roleKey === "administrador";
+  const isAdmin = roleKey === "administrador";
+  const isAlmacen = roleKey === "almacen";
 
+  const empleadoSucursalId =
+    user?.idSucursal ??
+    user?.sucursalId ??
+    user?.empleado?.idSucursal ??
+    user?.empleado?.sucursalId ??
+    user?.empleado?.sucursal?.id ??
+    null;
+
+  const canCreate = isAdmin || isAlmacen;
+  const canEdit = isAdmin || isAlmacen;
+  const canDelete = isAdmin;
 
   useEffect(() => {
     (async () => {
       try {
+        if (isAlmacen) {
+          if (!empleadoSucursalId) {
+            setSucursales([]);
+            toast.error("Tu usuario no tiene una sucursal asignada.");
+            return;
+          }
+
+          const sucursal = await ServiceSucursal.getById(empleadoSucursalId);
+          setSucursales(sucursal ? [sucursal] : []);
+          return;
+        }
+
         const s = await ServiceSucursal.getAll();
         const list = Array.isArray(s) ? s : s.items ?? [];
         setSucursales(list);
@@ -37,7 +69,7 @@ const AlmacenList = () => {
         console.error("Error cargando sucursales:", e);
       }
     })();
-  }, []);
+  }, [isAlmacen, empleadoSucursalId]);
 
   const sucursalMap = useMemo(() => {
   const m = {};
@@ -97,6 +129,25 @@ const AlmacenList = () => {
       toast.error("Error al cargar datos del almacén");
     }
   };
+  const serviceAlmacenFiltrado = useMemo(() => {
+    return {
+        ...ServiceAlmacen,
+        getAll: async (params = {}) => {
+          if (isAlmacen) {
+            if (!empleadoSucursalId) {
+              return { items: [], total: 0 };
+            }
+
+            return ServiceAlmacen.getAll({
+              ...params,
+              sucursalId: empleadoSucursalId,
+            });
+          }
+
+          return ServiceAlmacen.getAll(params);
+        },
+      };
+    }, [isAlmacen, empleadoSucursalId]);
 
   return (
     <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
@@ -164,7 +215,7 @@ const AlmacenList = () => {
 
       <GridGenerico
         ref={gridRef}
-        service={ServiceAlmacen}
+        service={serviceAlmacenFiltrado}
         columns={columns}
         defaultSortField="nombre"
         defaultSortAsc={true}
@@ -228,6 +279,8 @@ const AlmacenList = () => {
           }}
           initialData={formData}
           sucursales={sucursales}
+          sucursalContext={isAlmacen ? sucursales[0] : null}
+          bloquearSucursal={isAlmacen}
         />
       )}
     </Box>

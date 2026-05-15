@@ -6,7 +6,7 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import { ventasMenu } from "./menuConfig";
 import VentasList from "@/routes/pages/ventas/ventasList";
 import ClienteList from "@/routes/pages/clientes/clientelist";
-
+import EmpleadoInicioDashboard from "./EmpleadoInicioDashboard";
 const Reportes = () => (
   <>
     <Typography variant="h6" gutterBottom>
@@ -20,19 +20,7 @@ export default function VentasDashboard() {
   return (
     <DashboardLayout title="Panel de Ventas" menuItems={ventasMenu}>
       <Routes>
-        <Route
-          index
-          element={
-            <>
-              <Typography variant="h5" gutterBottom>
-                Resumen de Ventas
-              </Typography>
-              <Typography>
-                Accede al registro de ventas, clientes y reportes del sistema.
-              </Typography>
-            </>
-          }
-        />
+        <Route index element={<EmpleadoInicioDashboard />} />
         <Route path="ventas" element={<VentasList />} />
         <Route path="clientes" element={<ClienteList />} />
         <Route path="reportes" element={<Reportes />} />

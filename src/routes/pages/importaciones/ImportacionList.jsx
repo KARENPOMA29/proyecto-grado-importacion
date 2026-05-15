@@ -31,7 +31,7 @@ const ImportacionList = () => {
 
   const empleadoId = user?.id;
 
-  const canCreate = roleKey === "administrador" || roleKey === "almacen";
+  const canCreate = roleKey === "administrador";
   const canEdit = roleKey === "administrador";
   const canDelete = roleKey === "administrador";
 
@@ -375,10 +375,21 @@ const ImportacionList = () => {
 
       <GridGenerico
         ref={gridRef}
-        service={{
-          ...serviceForGrid,
-          getAll: ServiceImportacion.getControl,
-        }}
+        service={
+          roleKey === "pilotero"
+            ? {
+                ...ServiceImportacion,
+                getAll: (params) =>
+                  ServiceImportacion.getByEmpleado(
+                    empleadoId,
+                    params
+                  ),
+              }
+            : {
+                ...ServiceImportacion,
+                getAll: ServiceImportacion.getControl,
+              }
+        }
         columns={columns}
         pageSize={10}
         renderActions={(row) => (

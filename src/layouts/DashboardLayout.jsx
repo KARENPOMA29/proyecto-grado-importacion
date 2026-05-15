@@ -16,21 +16,35 @@ import {
   Button,
   Tooltip,
   Collapse,
+  Avatar,
+  useMediaQuery,
 } from "@mui/material";
+
 import MenuIcon from "@mui/icons-material/Menu";
 import LogoutIcon from "@mui/icons-material/Logout";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import PersonIcon from "@mui/icons-material/Person";
+import CloseIcon from "@mui/icons-material/Close";
+
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-// 👇 tu ruta
 import { getMenuByRole } from "@/routes/pages/dashboards/menuConfig";
 
-const DRAWER_WIDTH = 260;
-const COLLAPSED_WIDTH = 70;
-const ACTIVE_BG = "rgba(89, 43, 43, 0.56)";
+const DRAWER_WIDTH = 270;
+const COLLAPSED_WIDTH = 76;
+
+const BRAND = {
+  primary: "#592B2B",
+  primarySoft: "rgba(89,43,43,0.10)",
+  active: "rgba(89,43,43,0.88)",
+  bg: "#f3f4f6",
+  white: "#ffffff",
+  text: "#1f2329",
+  muted: "#6b7280",
+  border: "#e5e7eb",
+};
 
 const DrawerHeader = styled("div")(({ theme }) => ({
   ...theme.mixins.toolbar,
@@ -42,136 +56,260 @@ export default function DashboardLayout({
   children,
 }) {
   const theme = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up("sm"));
+
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+
   const [openGroups, setOpenGroups] = useState({
     Principal: true,
     Gestión: true,
-    Sistema: true,
+    Reportes: true,
+    Otros: true,
   });
 
-  // 1) menú según rol
   const resolvedMenu = useMemo(() => {
     if (menuItems && menuItems.length) return menuItems;
     return getMenuByRole(user?.rol || "");
   }, [menuItems, user?.rol]);
 
-  // 2) agrupar
   const groupedMenu = useMemo(() => {
     const groups = {};
+
     resolvedMenu.forEach((item) => {
-      const g = item.group || "Otros";
-      if (!groups[g]) groups[g] = [];
-      groups[g].push(item);
+      const groupName = item.group || "Otros";
+      if (!groups[groupName]) groups[groupName] = [];
+      groups[groupName].push(item);
     });
+
     const ordered = {};
-    ["Principal", "Gestión", "Sistema", "Otros"].forEach((g) => {
-      if (groups[g]) ordered[g] = groups[g];
+    ["Principal", "Gestión", "Reportes", "Otros"].forEach((groupName) => {
+      if (groups[groupName]) ordered[groupName] = groups[groupName];
     });
+
     return ordered;
   }, [resolvedMenu]);
 
-  const handleDrawerToggle = () => setMobileOpen((p) => !p);
-  const handleCollapseToggle = () => setCollapsed((p) => !p);
+  const handleDrawerToggle = () => {
+    setMobileOpen((prev) => !prev);
+  };
+
+  const handleCollapseToggle = () => {
+    setCollapsed((prev) => !prev);
+  };
+
+  const toggleGroup = (groupName) => {
+    if (collapsed && isDesktop) return;
+
+    setOpenGroups((prev) => ({
+      ...prev,
+      [groupName]: !prev[groupName],
+    }));
+  };
 
   const handleLogout = () => {
     logout?.();
     navigate("/login");
   };
 
-  const toggleGroup = (name) =>
-    setOpenGroups((prev) => ({ ...prev, [name]: !prev[name] }));
-
-  // 🔥 función para saber si un item está activo
   const isItemActive = (itemTo) => {
-    const path = location.pathname;
-    // caso especial: /admin debe ser EXACTO
-    if (itemTo === "/admin") {
-      return path === "/admin";
+    const currentPath = location.pathname;
+
+    // Rutas raíz de cada rol: solo deben pintarse si estás exactamente ahí
+    const rootRoutes = ["/admin", "/ventas", "/pilotero", "/almacen"];
+
+    if (rootRoutes.includes(itemTo)) {
+      return currentPath === itemTo;
     }
-    return path.startsWith(itemTo);
+
+    // Las demás rutas sí pueden pintar subrutas
+    return currentPath === itemTo || currentPath.startsWith(`${itemTo}/`);
+  };
+  const closeMobileDrawer = () => {
+    if (!isDesktop) setMobileOpen(false);
   };
 
-  // 📦 contenido del drawer
   const drawerContent = (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      {/* barra superior del drawer */}
+    <Box
+      sx={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        bgcolor: BRAND.white,
+      }}
+    >
+      {/* HEADER DEL MENÚ */}
       <Box
         sx={{
-          height: 56,
+          height: 64,
+          px: collapsed && isDesktop ? 1 : 2,
           display: "flex",
           alignItems: "center",
+          justifyContent: collapsed && isDesktop ? "center" : "space-between",
           gap: 1,
-          px: 1,
-          justifyContent: collapsed ? "center" : "flex-start",
         }}
       >
-        <IconButton
-          onClick={handleCollapseToggle}
-          size="small"
-          sx={{
-            backgroundColor: "rgba(89,43,43,0.12)",
-            "&:hover": { backgroundColor: "rgba(89,43,43,0.2)" },
-          }}
-        >
-          <ChevronLeftIcon
-            sx={{
-              transform: collapsed ? "rotate(180deg)" : "none",
-              transition: "transform .2s",
-            }}
-          />
-        </IconButton>
+        {!(collapsed && isDesktop) && (
+          <Box sx={{ minWidth: 0 }}>
+            <Typography
+              noWrap
+              sx={{
+                fontWeight: 800,
+                color: BRAND.primary,
+                fontSize: "1rem",
+                lineHeight: 1.2,
+              }}
+            >
+              {title}
+            </Typography>
 
-        {!collapsed && (
-          <Typography variant="subtitle1" noWrap sx={{ fontWeight: 600 }}>
-            {title}
-          </Typography>
+            <Typography
+              noWrap
+              sx={{
+                fontSize: "0.74rem",
+                color: BRAND.muted,
+                mt: 0.2,
+              }}
+            >
+              Menú principal
+            </Typography>
+          </Box>
+        )}
+
+        {isDesktop ? (
+          <Tooltip title={collapsed ? "Expandir menú" : "Contraer menú"}>
+            <IconButton
+              onClick={handleCollapseToggle}
+              size="small"
+              sx={{
+                bgcolor: BRAND.primarySoft,
+                color: BRAND.primary,
+                "&:hover": {
+                  bgcolor: "rgba(89,43,43,0.18)",
+                },
+              }}
+            >
+              <ChevronLeftIcon
+                sx={{
+                  transform: collapsed ? "rotate(180deg)" : "none",
+                  transition: "transform 0.2s ease",
+                }}
+              />
+            </IconButton>
+          </Tooltip>
+        ) : (
+          <IconButton onClick={handleDrawerToggle} size="small">
+            <CloseIcon />
+          </IconButton>
         )}
       </Box>
 
       <Divider />
 
-      {/* lista */}
-      <Box sx={{ flex: 1, overflowY: "auto" }}>
+      {/* USUARIO */}
+      {user && !(collapsed && isDesktop) && (
+        <Box
+          sx={{
+            mx: 2,
+            my: 2,
+            p: 1.5,
+            display: "flex",
+            alignItems: "center",
+            gap: 1.3,
+            borderRadius: 3,
+            bgcolor: BRAND.primarySoft,
+            border: `1px solid ${BRAND.border}`,
+          }}
+        >
+          <Avatar
+            sx={{
+              bgcolor: BRAND.primary,
+              width: 38,
+              height: 38,
+              fontWeight: 700,
+            }}
+          >
+            {(user.nombre || user.username || "U").charAt(0).toUpperCase()}
+          </Avatar>
+
+          <Box sx={{ minWidth: 0 }}>
+            <Typography
+              noWrap
+              sx={{
+                fontWeight: 700,
+                color: BRAND.text,
+                fontSize: "0.88rem",
+              }}
+            >
+              {user.nombre || user.username}
+            </Typography>
+
+            <Typography
+              noWrap
+              sx={{
+                color: BRAND.muted,
+                fontSize: "0.76rem",
+              }}
+            >
+              {user.rol}
+            </Typography>
+          </Box>
+        </Box>
+      )}
+
+      {/* LISTA DEL MENÚ */}
+      <Box
+        sx={{
+          flex: 1,
+          overflowY: "auto",
+          overflowX: "hidden",
+          px: collapsed && isDesktop ? 0.5 : 1,
+          py: 1,
+        }}
+      >
         {Object.entries(groupedMenu).map(([groupName, items]) => {
-          // 📌 modo colapsado: solo íconos
-          if (collapsed) {
+          const isOpen = openGroups[groupName] ?? true;
+
+          if (collapsed && isDesktop) {
             return (
-              <List key={groupName} dense sx={{ pt: 0 }}>
+              <List key={groupName} dense sx={{ py: 0.3 }}>
                 {items.map((item) => {
                   const Icon = item.icon;
                   const active = isItemActive(item.to);
-                  const node = (
-                    <ListItemButton
-                      key={item.to}
-                      component={NavLink}
-                      to={item.to}
-                      onClick={() => setMobileOpen(false)}
-                      sx={{
-                        justifyContent: "center",
-                        mx: 1,
-                        my: 0.3,
-                        borderRadius: 1.5,
-                        minHeight: 42,
-                        ...(active && {
-                          bgcolor: ACTIVE_BG,
-                          color: "#fff",
-                          "& .MuiListItemIcon-root": { color: "#fff" },
-                        }),
-                      }}
-                    >
-                      <ListItemIcon sx={{ minWidth: 0 }}>
-                        <Icon fontSize="small" />
-                      </ListItemIcon>
-                    </ListItemButton>
-                  );
+
                   return (
                     <Tooltip key={item.to} title={item.label} placement="right">
-                      {node}
+                      <ListItemButton
+                        component={NavLink}
+                        to={item.to}
+                        onClick={closeMobileDrawer}
+                        sx={{
+                          mx: 0.7,
+                          my: 0.4,
+                          minHeight: 44,
+                          borderRadius: 2.2,
+                          justifyContent: "center",
+                          color: active ? BRAND.white : BRAND.primary,
+                          bgcolor: active ? BRAND.active : "transparent",
+                          "&:hover": {
+                            bgcolor: active ? BRAND.active : BRAND.primarySoft,
+                          },
+                        }}
+                      >
+                        <ListItemIcon
+                          sx={{
+                            minWidth: 0,
+                            color: "inherit",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Icon fontSize="small" />
+                        </ListItemIcon>
+                      </ListItemButton>
                     </Tooltip>
                   );
                 })}
@@ -179,20 +317,31 @@ export default function DashboardLayout({
             );
           }
 
-          // 📌 modo normal: grupos que se abren/cierran
-          const isOpen = openGroups[groupName] ?? true;
           return (
-            <List key={groupName} dense sx={{ pt: 0 }}>
-              <ListItemButton onClick={() => toggleGroup(groupName)}>
+            <List key={groupName} dense sx={{ py: 0.4 }}>
+              <ListItemButton
+                onClick={() => toggleGroup(groupName)}
+                sx={{
+                  mx: 1,
+                  mb: 0.4,
+                  borderRadius: 2,
+                  minHeight: 36,
+                  color: BRAND.muted,
+                  "&:hover": {
+                    bgcolor: BRAND.primarySoft,
+                    color: BRAND.primary,
+                  },
+                }}
+              >
                 <ListItemText
                   primary={groupName.toUpperCase()}
                   primaryTypographyProps={{
-                    fontSize: "0.7rem",
-                    fontWeight: 700,
-                    color: "#6b6b6b",
-                    letterSpacing: 0.4,
+                    fontSize: "0.72rem",
+                    fontWeight: 800,
+                    letterSpacing: 0.5,
                   }}
                 />
+
                 {isOpen ? (
                   <ExpandLessIcon fontSize="small" />
                 ) : (
@@ -204,28 +353,44 @@ export default function DashboardLayout({
                 {items.map((item) => {
                   const Icon = item.icon;
                   const active = isItemActive(item.to);
+
                   return (
                     <ListItemButton
                       key={item.to}
                       component={NavLink}
                       to={item.to}
-                      onClick={() => setMobileOpen(false)}
+                      onClick={closeMobileDrawer}
                       sx={{
-                        mx: 1.5,
-                        my: 0.25,
-                        borderRadius: 1.5,
-                        minHeight: 40,
-                        ...(active && {
-                          bgcolor: ACTIVE_BG,
-                          color: "#fff",
-                          "& .MuiListItemIcon-root": { color: "#fff" },
-                        }),
+                        mx: 1,
+                        my: 0.35,
+                        minHeight: 44,
+                        borderRadius: 2.3,
+                        color: active ? BRAND.white : BRAND.text,
+                        bgcolor: active ? BRAND.active : "transparent",
+                        transition: "all 0.2s ease",
+                        "&:hover": {
+                          bgcolor: active ? BRAND.active : BRAND.primarySoft,
+                          transform: "translateX(2px)",
+                        },
                       }}
                     >
-                      <ListItemIcon sx={{ minWidth: 32 }}>
+                      <ListItemIcon
+                        sx={{
+                          minWidth: 36,
+                          color: active ? BRAND.white : BRAND.primary,
+                        }}
+                      >
                         <Icon fontSize="small" />
                       </ListItemIcon>
-                      <ListItemText primary={item.label} />
+
+                      <ListItemText
+                        primary={item.label}
+                        primaryTypographyProps={{
+                          fontSize: "0.9rem",
+                          fontWeight: active ? 700 : 500,
+                          noWrap: true,
+                        }}
+                      />
                     </ListItemButton>
                   );
                 })}
@@ -237,29 +402,40 @@ export default function DashboardLayout({
 
       <Divider />
 
-      <Box sx={{ p: collapsed ? 1 : 2 }}>
-        <Button
-          fullWidth={!collapsed}
-          startIcon={!collapsed ? <LogoutIcon /> : null}
-          onClick={handleLogout}
-          sx={{
-            justifyContent: collapsed ? "center" : "flex-start",
-            color: "#592B2B",
-            fontWeight: 600,
-          }}
-        >
-          {collapsed ? <LogoutIcon /> : "Cerrar sesión"}
-        </Button>
+      {/* CERRAR SESIÓN */}
+      <Box sx={{ p: collapsed && isDesktop ? 1 : 2 }}>
+        <Tooltip title={collapsed && isDesktop ? "Cerrar sesión" : ""}>
+          <Button
+            fullWidth
+            onClick={handleLogout}
+            startIcon={collapsed && isDesktop ? null : <LogoutIcon />}
+            sx={{
+              minHeight: 44,
+              borderRadius: 2.5,
+              justifyContent: collapsed && isDesktop ? "center" : "flex-start",
+              color: BRAND.primary,
+              fontWeight: 800,
+              textTransform: "none",
+              bgcolor: BRAND.primarySoft,
+              "&:hover": {
+                bgcolor: "rgba(89,43,43,0.18)",
+              },
+            }}
+          >
+            {collapsed && isDesktop ? <LogoutIcon /> : "Cerrar sesión"}
+          </Button>
+        </Tooltip>
       </Box>
     </Box>
   );
 
-  // drawer mobile container
   const container =
     typeof window !== "undefined" ? () => window.document.body : undefined;
 
+  const currentDrawerWidth = collapsed ? COLLAPSED_WIDTH : DRAWER_WIDTH;
+
   return (
-    <Box sx={{ display: "flex" }}>
+    <Box sx={{ display: "flex", bgcolor: BRAND.bg }}>
       <CssBaseline />
 
       {/* APPBAR */}
@@ -268,29 +444,61 @@ export default function DashboardLayout({
         elevation={0}
         sx={{
           zIndex: (theme) => theme.zIndex.drawer + 1,
-          backgroundColor: "rgba(89, 43, 43, 0.56)",
+          bgcolor: "rgba(89, 43, 43, 0.92)",
           backdropFilter: "blur(12px)",
+          borderBottom: "1px solid rgba(255,255,255,0.15)",
         }}
       >
-        <Toolbar>
-          {/* menú móvil */}
+        <Toolbar
+          sx={{
+            minHeight: { xs: 58, sm: 64 },
+            px: { xs: 1.5, sm: 3 },
+          }}
+        >
           <IconButton
             color="inherit"
             edge="start"
             onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { sm: "none" } }}
+            sx={{
+              mr: 1.5,
+              display: { xs: "inline-flex", sm: "none" },
+            }}
           >
             <MenuIcon />
           </IconButton>
 
-          <Typography variant="h6" noWrap sx={{ flexGrow: 1 }}>
+          <Typography
+            noWrap
+            sx={{
+              flexGrow: 1,
+              fontSize: { xs: "1rem", sm: "1.15rem" },
+              fontWeight: 800,
+            }}
+          >
             {title}
           </Typography>
 
           {user && (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Box
+              sx={{
+                display: { xs: "none", md: "flex" },
+                alignItems: "center",
+                gap: 1,
+                px: 1.5,
+                py: 0.7,
+                borderRadius: 999,
+                bgcolor: "rgba(255,255,255,0.12)",
+              }}
+            >
               <PersonIcon fontSize="small" />
-              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              <Typography
+                noWrap
+                sx={{
+                  fontSize: "0.86rem",
+                  fontWeight: 600,
+                  maxWidth: 260,
+                }}
+              >
                 {user.nombre || user.username} — {user.rol}
               </Typography>
             </Box>
@@ -302,11 +510,11 @@ export default function DashboardLayout({
       <Box
         component="nav"
         sx={{
-          width: { sm: collapsed ? COLLAPSED_WIDTH : DRAWER_WIDTH },
+          width: { sm: currentDrawerWidth },
           flexShrink: { sm: 0 },
         }}
       >
-        {/* móvil */}
+        {/* MÓVIL */}
         <Drawer
           container={container}
           variant="temporary"
@@ -317,14 +525,16 @@ export default function DashboardLayout({
             display: { xs: "block", sm: "none" },
             "& .MuiDrawer-paper": {
               boxSizing: "border-box",
-              width: DRAWER_WIDTH,
+              width: "86%",
+              maxWidth: DRAWER_WIDTH,
+              borderRight: "none",
             },
           }}
         >
           {drawerContent}
         </Drawer>
 
-        {/* desktop */}
+        {/* ESCRITORIO */}
         <Drawer
           variant="permanent"
           open
@@ -332,10 +542,12 @@ export default function DashboardLayout({
             display: { xs: "none", sm: "block" },
             "& .MuiDrawer-paper": {
               boxSizing: "border-box",
-              width: collapsed ? COLLAPSED_WIDTH : DRAWER_WIDTH,
+              width: currentDrawerWidth,
+              overflowX: "hidden",
+              borderRight: `1px solid ${BRAND.border}`,
               transition: theme.transitions.create("width", {
                 easing: theme.transitions.easing.sharp,
-                duration: theme.transitions.duration.enteringScreen,
+                duration: theme.transitions.duration.shorter,
               }),
             },
           }}
@@ -349,18 +561,29 @@ export default function DashboardLayout({
         component="main"
         sx={{
           flexGrow: 1,
-          p: { xs: 2, sm: 3 },
           width: {
             xs: "100%",
-            sm: `calc(100% - ${collapsed ? COLLAPSED_WIDTH : DRAWER_WIDTH}px)`,
+            sm: `calc(100% - ${currentDrawerWidth}px)`,
           },
-          bgcolor: (theme) =>
-            theme.palette.mode === "light" ? "#f3f4f6" : "background.default",
           minHeight: "100vh",
+          bgcolor: BRAND.bg,
+          transition: theme.transitions.create(["width", "margin"], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.shorter,
+          }),
         }}
       >
         <DrawerHeader />
-        {children}
+
+        <Box
+          sx={{
+            p: { xs: 2, sm: 3 },
+            maxWidth: "100%",
+            overflowX: "hidden",
+          }}
+        >
+          {children}
+        </Box>
       </Box>
     </Box>
   );

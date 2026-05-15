@@ -158,9 +158,29 @@ const remove = async (id) => {
   const { data } = await api.delete(`${BASE}/${id}`);
   return data;
 };
-const getByEmpleado = async (empleadoId) => {
-  const { data } = await api.get(`${BASE}/empleado/${empleadoId}`);
-  return Array.isArray(data) ? data : data.items || data;
+const getByEmpleado = async (empleadoId, params = {}) => {
+  const {
+    search = "",
+    page = 1,
+    pageSize = 10,
+  } = params;
+
+  const { data } = await api.get(`${BASE}/empleado/${empleadoId}`, {
+    params: {
+      search: search || undefined,
+      page,
+      pageSize,
+    },
+  });
+
+  if (Array.isArray(data)) {
+    return { items: data, total: data.length };
+  }
+
+  return {
+    items: data.items || [],
+    total: data.total || 0,
+  };
 };
 const getConcluidas = async (params = {}) => {
   const { search = "", page = 1, pageSize = 1000 } = params;
