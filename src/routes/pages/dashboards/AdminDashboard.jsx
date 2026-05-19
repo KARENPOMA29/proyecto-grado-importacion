@@ -59,7 +59,7 @@ import {
 
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { adminMenu } from "./menuConfig";
-
+import SuccessDialog from "@/components/SuccessDialog";
 import ServiceAlerta from "@/services/ServiceAlerta";
 import ServiceReporteVentas from "@/services/ServiceReporteVentas";
 import ServiceReporteInventario from "@/services/ServiceReporteInventario";
@@ -683,7 +683,9 @@ export default function AdminDashboard() {
   const [lastUpdated, setLastUpdated] = React.useState(null);
   const [openAlertasModal, setOpenAlertasModal] = React.useState(false);
   const [openStockModal, setOpenStockModal] = React.useState(false);
-
+  const [openSuccess, setOpenSuccess] = React.useState(false);
+  const [successMessage, setSuccessMessage] = React.useState("");
+  const [successTitle, setSuccessTitle] = React.useState("");
   const [ventasDash, setVentasDash] = React.useState({});
   const [stockDash, setStockDash] = React.useState({});
   const [importDash, setImportDash] = React.useState({});
@@ -719,7 +721,7 @@ export default function AdminDashboard() {
       await ServiceAlerta.verificarStockBajo();
 
       const [alertasRes, ventasDashRes, stockDashRes, importDashRes] = await Promise.allSettled([
-        ServiceAlerta.getDashboard(20),
+        ServiceAlerta.getDashboard(1000),
         ServiceReporteVentas.getDashboard(),
         ServiceReporteInventario.getStockDashboard(),
         ServiceReporteImportaciones.getDashboard(),
@@ -765,6 +767,16 @@ export default function AdminDashboard() {
     cargarDatos();
   }, [cargarDatos]);
 
+  React.useEffect(() => {
+    if (!openSuccess) return;
+
+    const timer = setTimeout(() => {
+      setOpenSuccess(false);
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, [openSuccess]);
+  
   const handleMarcarLeida = async (id) => {
     try {
       await ServiceAlerta.marcarLeida(id);
@@ -785,6 +797,29 @@ export default function AdminDashboard() {
       );
     } catch (error) {
       console.error("Error marcando todas:", error);
+    }
+  };
+
+  const handleEnviarStockCorreo = async () => {
+    try {
+      await ServiceAlerta.enviarStockBajoCorreo();
+
+      setSuccessTitle("¡Correo enviado!");
+      setSuccessMessage(
+        "El resumen de productos con stock bajo fue enviado correctamente."
+      );
+
+      setOpenSuccess(true);
+
+    } catch (error) {
+      console.error("Error enviando correo:", error);
+
+      setSuccessTitle("Error");
+      setSuccessMessage(
+        "No se pudo enviar el resumen al correo."
+      );
+
+      setOpenSuccess(true);
     }
   };
 
@@ -1163,13 +1198,19 @@ export default function AdminDashboard() {
         loading={loading}
       />
 
-      <StockBajoModal
+     <StockBajoModal
         open={openStockModal}
         onClose={() => setOpenStockModal(false)}
         alertas={alertasStockBajo}
         onMarcarLeida={handleMarcarLeida}
         onMarcarTodas={() => handleMarcarTodas("STOCK_BAJO")}
+        onEnviarCorreo={handleEnviarStockCorreo}
         loading={loading}
+      />
+      <SuccessDialog
+        open={openSuccess}
+        title={successTitle}
+        message={successMessage}
       />
     </DashboardLayout>
   );

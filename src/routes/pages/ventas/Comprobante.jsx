@@ -225,7 +225,18 @@ export default function Comprobante({ open, onClose, ventaResumen }) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="md"
+      PaperProps={{
+        sx: {
+          width: { xs: "96%", sm: "90%", md: "850px" },
+          m: { xs: 1, sm: 2 },
+        },
+      }}
+    >
       <DialogTitle
         sx={{
           bgcolor: "#592B2B",
@@ -336,80 +347,80 @@ export default function Comprobante({ open, onClose, ventaResumen }) {
             <Typography fontWeight={900} color="#2b1111" mb={1}>
               Detalles de la venta
             </Typography>
-
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ bgcolor: "#f6f1f1" }}>
-                  <TableCell>
-                    <b>Producto</b>
-                  </TableCell>
-                  <TableCell>
-                    <b>Marca / Modelo</b>
-                  </TableCell>
-                  <TableCell>
-                    <b>N° Serie</b>
-                  </TableCell>
-                  <TableCell align="right">
-                    <b>Precio (Bs)</b>
-                  </TableCell>
-                  <TableCell align="right">
-                    <b>Subtotal (Bs)</b>
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-
-              <TableBody>
-                {detalles.length > 0 ? (
-                  detalles.map((detalle, index) => {
-                    const prod = detalle.producto || {};
-                    const modelo = prod.modelo || {};
-                    const marca = modelo.marca || {};
-
-                    const marcaModelo =
-                      [
-                        marca.nombre || prod.marcaNombre,
-                        modelo.nombreModelo || prod.modeloNombre,
-                        modelo.color || prod.color,
-                      ]
-                        .filter(Boolean)
-                        .join(" - ") || "—";
-
-                    const precioUnitario = Number(
-                      detalle.precioUnitario || prod.precio || detalle.subtotal || 0
-                    ).toFixed(2);
-
-                    return (
-                      <TableRow key={detalle.id || index}>
-                        <TableCell>
-                          {prod.descripcion || detalle.descripcion || "Producto"}
-                        </TableCell>
-
-                        <TableCell>{marcaModelo}</TableCell>
-
-                        <TableCell>
-                          {prod.numeroSerie || detalle.numeroSerie || "—"}
-                        </TableCell>
-
-                        <TableCell align="right">
-                          {precioUnitario}
-                        </TableCell>
-
-                        <TableCell align="right">
-                          {formatMoney(detalle.subtotal)}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center">
-                      No hay productos registrados
+            <Box sx={{ width: "100%", overflowX: "auto" }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ bgcolor: "#f6f1f1" }}>
+                    <TableCell>
+                      <b>Producto</b>
+                    </TableCell>
+                    <TableCell>
+                      <b>Marca / Modelo</b>
+                    </TableCell>
+                    <TableCell>
+                      <b>N° Serie</b>
+                    </TableCell>
+                    <TableCell align="right">
+                      <b>Precio (Bs)</b>
+                    </TableCell>
+                    <TableCell align="right">
+                      <b>Subtotal (Bs)</b>
                     </TableCell>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHead>
 
+                <TableBody>
+                  {detalles.length > 0 ? (
+                    detalles.map((detalle, index) => {
+                      const prod = detalle.producto || {};
+                      const modelo = prod.modelo || {};
+                      const marca = modelo.marca || {};
+
+                      const marcaModelo =
+                        [
+                          marca.nombre || prod.marcaNombre,
+                          modelo.nombreModelo || prod.modeloNombre,
+                          modelo.color || prod.color,
+                        ]
+                          .filter(Boolean)
+                          .join(" - ") || "—";
+
+                      const precioUnitario = Number(
+                        detalle.precioUnitario || prod.precio || detalle.subtotal || 0
+                      ).toFixed(2);
+
+                      return (
+                        <TableRow key={detalle.id || index}>
+                          <TableCell>
+                            {prod.descripcion || detalle.descripcion || "Producto"}
+                          </TableCell>
+
+                          <TableCell>{marcaModelo}</TableCell>
+
+                          <TableCell>
+                            {prod.numeroSerie || detalle.numeroSerie || "—"}
+                          </TableCell>
+
+                          <TableCell align="right">
+                            {precioUnitario}
+                          </TableCell>
+
+                          <TableCell align="right">
+                            {formatMoney(detalle.subtotal)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center">
+                        No hay productos registrados
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Box>
             <Box
               className="total"
               sx={{

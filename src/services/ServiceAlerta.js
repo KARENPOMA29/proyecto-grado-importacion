@@ -1,4 +1,5 @@
 // src/services/ServiceAlerta.js
+
 import api from "./api";
 
 const resource = "/alertas";
@@ -16,9 +17,16 @@ const ServiceAlerta = {
     return res.data;
   },
 
-  // 🔥 NUEVO: verifica stock bajo desde el front
   async verificarStockBajo() {
     const res = await api.post(`${resource}/verificar-stock-bajo`);
+    return res.data;
+  },
+
+  // ✅ NUEVO
+  async enviarStockBajoCorreo() {
+    const res = await api.post(
+      `${resource}/enviar-stock-bajo-correo`
+    );
     return res.data;
   },
 };

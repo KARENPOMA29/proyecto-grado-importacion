@@ -307,13 +307,7 @@ const MovimientoDetalleDialog = ({ open, onClose, movimiento, importacion }) => 
             <Paper sx={{ p: 2.5, borderRadius: 2, height: "100%" }}>
               <Typography variant="subtitle1" fontWeight={900} mb={2}>Información</Typography>
               
-              <Box display="flex" gap={1.5} alignItems="center" mb={2}>
-                <PersonIcon sx={{ color: "#0f766e" }} />
-                <Box>
-                  <Typography variant="caption" color="text.secondary">Empleado encargado</Typography>
-                  <Typography fontWeight={900}>{empleadoNombre}</Typography>
-                </Box>
-              </Box>
+             
               
               <Divider sx={{ my: 2 }} />
               

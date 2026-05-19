@@ -35,17 +35,11 @@ export const AuthProvider = ({ children }) => {
 
 
   const login = (apiUser) => {
-    // apiUser viene de FASTAPI: {id, nombre, apellido, rol, correo, usuario, idSucursal}
-
     const userData = {
-      id: apiUser.id,
-      nombre: apiUser.nombre,
-      apellido: apiUser.apellido,
-      nombreCompleto: `${apiUser.nombre} ${apiUser.apellido}`.trim(),
-      rol: apiUser.rol,
-      correo: apiUser.correo,
-      usuario: apiUser.usuario,
-      idSucursal: apiUser.idSucursal,   // 👈👈👈 IMPORTANTE
+      ...apiUser,
+      nombreCompleto:
+        apiUser.nombreCompleto ||
+        `${apiUser.nombre || ""} ${apiUser.apellido || ""}`.trim(),
     };
 
     try {

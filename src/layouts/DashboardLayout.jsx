@@ -257,9 +257,21 @@ export default function DashboardLayout({
             >
               {user.rol}
             </Typography>
-          </Box>
-        </Box>
-      )}
+
+            <Typography
+              noWrap
+              sx={{
+                color: BRAND.primary,
+                fontSize: "0.72rem",
+                fontWeight: 800,
+                mt: 0.2,
+              }}
+            >
+              Sucursal: {user?.sucursalNombre || "No asignada"}
+            </Typography>
+                      </Box>
+                    </Box>
+                  )}
 
       {/* LISTA DEL MENÚ */}
       <Box
@@ -500,6 +512,7 @@ export default function DashboardLayout({
                 }}
               >
                 {user.nombre || user.username} — {user.rol}
+                {user?.sucursalNombre ? ` • ${user.sucursalNombre}` : ""}
               </Typography>
             </Box>
           )}

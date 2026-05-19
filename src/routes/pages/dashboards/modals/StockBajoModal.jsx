@@ -41,6 +41,7 @@ export default function StockBajoModal({
   alertas,
   onMarcarLeida,
   onMarcarTodas,
+  onEnviarCorreo,
   loading,
 }) {
   return (
@@ -223,23 +224,45 @@ export default function StockBajoModal({
         </Button>
 
         {alertas.length > 0 && (
-          <Button
-            variant="outlined"
-            onClick={onMarcarTodas}
-            sx={{
-              borderColor: BRAND.red,
-              color: BRAND.red,
-              fontWeight: 700,
-              textTransform: "none",
-
-              "&:hover": {
+          <>
+            <Button
+              variant="outlined"
+              onClick={onMarcarTodas}
+              sx={{
                 borderColor: BRAND.red,
-                bgcolor: rgba(COLORS.primary, 0.05),
-              },
-            }}
-          >
-            Marcar todas
-          </Button>
+                color: BRAND.red,
+                fontWeight: 700,
+                textTransform: "none",
+
+                "&:hover": {
+                  borderColor: BRAND.red,
+                  bgcolor: rgba(COLORS.primary, 0.05),
+                },
+              }}
+            >
+              Marcar todas
+            </Button>
+
+            <Button
+              variant="contained"
+              onClick={onEnviarCorreo}
+              sx={{
+                bgcolor: BRAND.red,
+                color: BRAND.white,
+                fontWeight: 700,
+                textTransform: "none",
+                borderRadius: 2,
+                boxShadow: "none",
+
+                "&:hover": {
+                  bgcolor: "#8c1634",
+                  boxShadow: "none",
+                },
+              }}
+            >
+              Enviar a correo
+            </Button>
+          </>
         )}
       </DialogActions>
     </Dialog>

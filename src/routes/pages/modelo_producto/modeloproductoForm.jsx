@@ -749,18 +749,7 @@ const ModeloProductoForm = ({ onClose, onSuccess, initialData = null }) => {
                 sx={fieldSx}
               />
 
-              <TextField
-                label="Stock actual"
-                fullWidth
-                type="number"
-                inputMode="numeric"
-                value={form.stockActual}
-                disabled
-                helperText="Se iniciará automáticamente en 0."
-                size="small"
-                inputProps={{ min: 0 }}
-                sx={fieldSx}
-              />
+
             </Box>
           </Box>
 

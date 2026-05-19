@@ -8,6 +8,7 @@ import {
   MapPin,
   Check,
   Boxes,
+  RefreshCw,
   ChevronRight,
   Plus,
   Pencil,
@@ -185,18 +186,17 @@ const MovimientoList = () => {
         setSelectedCiudad(sucursal?.ciudad || null);
         setAlmacenes(lista);
 
-        if (lista.length > 0) {
-          setSelectedAlmacen(lista[0]);
-          setStep(3);
-        } else {
-          setSelectedAlmacen(null);
-          setStep(2);
-        }
+        // IMPORTANTE:
+        // No seleccionamos automáticamente el primer almacén.
+        // El usuario debe elegir uno de la lista.
+        setSelectedAlmacen(null);
+        setStep(2);
       } catch (error) {
         if (!activo) return;
 
-        console.error("Error cargando almacén del usuario:", error);
-        toast.error("No se pudo cargar tu almacén.");
+        console.error("Error cargando almacenes del usuario:", error);
+        toast.error("No se pudieron cargar los almacenes de tu sucursal.");
+
         setAlmacenes([]);
         setSelectedAlmacen(null);
         setStep(2);
@@ -315,12 +315,15 @@ const MovimientoList = () => {
   const formatFecha = (value) => {
     if (!value) return "—";
 
-    const fecha = String(value).split("T")[0];
-    const [yyyy, mm, dd] = fecha.split("-");
+    const fecha = new Date(value);
 
-    if (!yyyy || !mm || !dd) return "—";
+    if (isNaN(fecha.getTime())) return "—";
 
-    return `${dd}/${mm}/${yyyy}`;
+    return fecha.toLocaleDateString("es-BO", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
   };
 
   const getTextoProducto = (row) => {
@@ -339,32 +342,32 @@ const MovimientoList = () => {
       name: "Producto (serie)",
       selector: (row) => getTextoProducto(row),
       sortable: true,
-      minWidth: "170px",
+      Width: "170px",
     },
     {
       name: "Categoría",
       selector: (row) => row?.categoria?.nombre || "—",
       sortable: true,
-      minWidth: "150px",
+      Width: "150px",
     },
     {
       name: "Modelo",
       selector: (row) =>
         row?.modeloProducto?.nombreModelo || row?.modeloProducto?.nombre || "—",
       sortable: true,
-      minWidth: "170px",
+      Width: "170px",
     },
     {
       name: "Importación",
       selector: (row) => row?.importacion?.codigo || "—",
       sortable: true,
-      minWidth: "150px",
+      Width: "150px",
     },
     {
       name: "Observado",
       selector: (row) => row?.productoObservado ?? "",
       sortable: true,
-      minWidth: "130px",
+      Width: "130px",
       cell: (row) => {
         const observado = Number(row?.productoObservado);
 
@@ -395,7 +398,7 @@ const MovimientoList = () => {
       name: "Estado producto",
       selector: (row) => row?.productoEstado ?? "",
       sortable: true,
-      minWidth: "150px",
+      Width: "150px",
       cell: (row) => {
         const estado = Number(row?.productoEstado);
 
@@ -432,42 +435,26 @@ const MovimientoList = () => {
       name: "Fecha",
       selector: (row) => row?.fecha || row?.fechaRegistro || "",
       sortable: true,
-      minWidth: "120px",
+      Width: "120px",
       cell: (row) => formatFecha(row?.fecha || row?.fechaRegistro),
     },
   ];
 
-  const baseMovimientoService = useMemo(() => {
-    if (isAlmacen && usuarioIdLogueado) {
-      return {
-        ...ServiceMovimiento,
-        getAll: (params = {}) =>
-          ServiceMovimiento.getAll({
-            ...params,
-            usuarioId: usuarioIdLogueado,
-          }),
-      };
-    }
-
-    return ServiceMovimiento;
-  }, [isAlmacen, usuarioIdLogueado]);
-
   const serviceMovimientoFiltrado = useMemo(() => {
     return {
-      ...baseMovimientoService,
+      ...ServiceMovimiento,
       getAll: async (params = {}) => {
         if (!selectedAlmacen?.id) {
           return { items: [], total: 0 };
         }
 
-        return baseMovimientoService.getAll({
+        return ServiceMovimiento.getAll({
           ...params,
           almacenId: selectedAlmacen.id,
         });
       },
     };
-  }, [baseMovimientoService, selectedAlmacen]);
-
+  }, [selectedAlmacen]);
   useEffect(() => {
     if (step === 3 && gridRef.current) {
       gridRef.current.refetch?.();
@@ -985,9 +972,51 @@ const MovimientoList = () => {
         }}
       >
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, color: "#3A1A1A", mb: 0.5 }}>
-            Movimientos de Inventario
-          </Typography>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+              flexWrap: "wrap",
+            }}
+          >
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 700,
+                color: "#3A1A1A",
+                mb: 0.5,
+              }}
+            >
+              Movimientos de Inventario
+            </Typography>
+
+            <Button
+              onClick={() => {
+                if (gridRef.current) {
+                  gridRef.current.refetch?.();
+                  toast.success("Lista actualizada");
+                }
+              }}
+              startIcon={<RefreshCw size={18} />}
+              sx={{
+                color: "#fff",
+                border: "1px solid rgba(255,255,255,0.3)",
+                borderRadius: 3,
+                px: 2.5,
+                py: 1,
+                fontWeight: 600,
+                textTransform: "none",
+                background: "linear-gradient(135deg, #592B2B 0%, #3A1A1A 100%)",
+                "&:hover": {
+                  background: "linear-gradient(135deg, #3A1A1A 0%, #592B2B 100%)",
+                  borderColor: "#fff",
+                },
+              }}
+            >
+              Actualizar
+            </Button>
+          </Box>
 
           <Typography variant="body2" color="text.secondary">
             {isAlmacen

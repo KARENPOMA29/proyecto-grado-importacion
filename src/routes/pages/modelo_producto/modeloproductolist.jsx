@@ -127,7 +127,6 @@ const ModeloProductoList = () => {
     { label: "Color", key: "color" },
     { label: "Capacidad/Tamaño", key: "capacidadOTamano" },
     { label: "Unidad", key: "unidadMedida" },
-    { label: "Stock Actual", key: "stockActual" },
     { label: "Stock Mínimo", key: "stockMinimo" },
     {
       label: "Duración Garantía",

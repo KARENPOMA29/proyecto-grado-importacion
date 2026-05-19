@@ -112,6 +112,7 @@ const ReporteImportacion = () => {
     proveedor: "",
     empleado: "",
     nivelRetraso: "",
+    estadoRetraso: "",
   });
 
   const [dashboard, setDashboard] = useState({});
@@ -145,6 +146,7 @@ const ReporteImportacion = () => {
       proveedor: "",
       empleado: "",
       nivelRetraso: "",
+      estadoRetraso: "",
     });
   };
 
@@ -160,6 +162,7 @@ const ReporteImportacion = () => {
         proveedor: filters.proveedor || undefined,
         empleado: filters.empleado || undefined,
         nivelRetraso: filters.nivelRetraso || undefined,
+        estadoRetraso: filters.estadoRetraso || undefined,
       };
 
       const [
@@ -552,7 +555,21 @@ const ReporteImportacion = () => {
     setOpenExportDialog(false);
     setExportAnchorEl(null);
   };
+  const ChipEstadoRetraso = ({ label }) => {
+    const value = String(label || "").toLowerCase();
 
+    const color = value.includes("concluida")
+      ? { bg: "#FEF3C7", text: "#92400E" }
+      : { bg: "#FEE2E2", text: "#991B1B" };
+
+    return (
+      <Chip
+        label={label || "—"}
+        size="small"
+        sx={{ bgcolor: color.bg, color: color.text, fontWeight: 800 }}
+      />
+    );
+  };
   return (
     <Box sx={{ p: { xs: 2, md: 4 } }}>
       <Box
@@ -750,6 +767,21 @@ const ReporteImportacion = () => {
               ))}
             </TextField>
           </Grid>
+          <Grid item xs={12} sm={6} md={2.4}>
+            <TextField
+              select
+              fullWidth
+              size="small"
+              label="Estado retraso"
+              value={filters.estadoRetraso}
+              onChange={(e) => handleFilterChange("estadoRetraso", e.target.value)}
+              sx={fieldStyle}
+            >
+              <MenuItem value="">Todos</MenuItem>
+              <MenuItem value="Pendiente con retraso">Pendiente con retraso</MenuItem>
+              <MenuItem value="Concluida con retraso">Concluida con retraso</MenuItem>
+            </TextField>
+          </Grid>
 
           <Grid item xs={12} sm={6} md={2.4}>
             <TextField
@@ -908,6 +940,7 @@ const ReporteImportacion = () => {
                   ["fechaLlegada", "Fecha llegada", formatDate],
                   ["diasRetraso", "Días"],
                   ["nivelRetraso", "Nivel", (v) => <ChipRetraso label={v} />],
+                  ["estadoRetraso", "Estado", (v) => <ChipEstadoRetraso label={v} />],
                   ["totalProductos", "Productos"],
                   ["inversionTotal", "Inversión", money],
                 ]}

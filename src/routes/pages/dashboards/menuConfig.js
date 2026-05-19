@@ -50,14 +50,12 @@ export const pilotoMenu = [
   { label: "Proveedores", icon: GroupIcon, to: "/pilotero/proveedores", group: "Principal" },
 ];
 
-
 // src/routes/menuConfig.js
 
 export const almacenMenu = [
   // PRINCIPAL
   { label: "Resumen", icon: DashboardIcon, to: "/almacen", group: "Principal" },
   { label: "Entradas", icon: InventoryIcon, to: "/almacen/inventario", group: "Principal" },
-  { label: "Importaciones", icon: LocalShippingIcon, to: "/almacen/importaciones", group: "Principal" },
   { label: "Sucursales", icon: StoreIcon, to: "/almacen/sucursales", group: "Principal" },
 
   // GESTIÓN
