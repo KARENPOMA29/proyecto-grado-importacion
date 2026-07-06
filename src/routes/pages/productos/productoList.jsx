@@ -440,31 +440,7 @@ const ProductList = () => {
             </FormControl>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={2}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Importación</InputLabel>
-              <Select
-                value={filters.importacionId}
-                label="Importación"
-                onChange={(e) => handleFilterChange("importacionId", e.target.value)}
-                sx={{
-                  borderRadius: 2,
-                  bgcolor: "white",
-                  minWidth: 180,
-                  "& .MuiSelect-select": {
-                    fontWeight: 600,
-                  },
-                }}
-              >
-                <MenuItem value="">Todas las importaciones</MenuItem>
-                {importaciones.map((imp) => (
-                  <MenuItem key={imp.id} value={imp.id}>
-                    {imp.codigo || imp.codigoImportacion}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
+          
 
           <Grid item xs={12} sm={6} md={2}>
             <Button

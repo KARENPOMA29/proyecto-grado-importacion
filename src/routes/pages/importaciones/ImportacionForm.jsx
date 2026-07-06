@@ -83,8 +83,12 @@ export default function ImportacionForm({
 
   const fetchEmpleados = async () => {
     try {
-      const res = await ServiceEmpleado.getAll();
-      const emps = Array.isArray(res) ? res : res.items || [];
+      const res = await ServiceEmpleado.getAll({
+        page: 1,
+        pageSize: 1000,
+      });
+
+      const emps = res.items || [];
 
       const piloteros = emps.filter((emp) => {
         const rol = (
